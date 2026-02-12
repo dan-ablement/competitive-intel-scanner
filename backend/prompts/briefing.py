@@ -1,35 +1,48 @@
 """Prompt template for generating morning briefings."""
 
-BRIEFING_SYSTEM = """You are a competitive intelligence analyst preparing a morning briefing for \
+BRIEFING_SYSTEM_PROMPT = """You are a competitive intelligence analyst preparing a morning briefing for \
 Augment Code's leadership team. Synthesize the following intelligence items into a \
-cohesive strategic briefing.
+cohesive strategic briefing."""
 
-Context:
+BRIEFING_USER_PROMPT = """Context:
 - Augment Profile: {augment_profile}
 - Competitor Profiles: {competitor_profiles}
 
 Analysis Cards from Past 24 Hours:
 {analysis_cards_json}
 
-Generate a briefing with the following sections:
+Generate a briefing with the following sections in Markdown format:
 
 ## Executive Summary
-## Priority Items
-## Market Signals
-## Recommended Actions
-## Full Item Details
+A concise overview of the most important competitive developments from the past 24 hours.
 
-Respond in Markdown format."""
+## Priority Items
+Highlight RED and YELLOW priority items with their implications for Augment.
+
+## Market Signals
+Broader market trends and patterns observed across the intelligence items.
+
+## Recommended Actions
+Specific, actionable recommendations for the leadership team based on the intelligence.
+
+## Full Item Details
+A brief summary of each analysis card included in this briefing, grouped by competitor.
+
+Respond in Markdown format only. Do not wrap in code fences."""
 
 
 def build_briefing_prompt(
     augment_profile: str,
     competitor_profiles: str,
     analysis_cards_json: str,
-) -> str:
-    """Build the morning briefing prompt with all context filled in."""
-    return BRIEFING_SYSTEM.format(
+) -> tuple[str, str]:
+    """Build the morning briefing prompt with all context filled in.
+
+    Returns (system_prompt, user_prompt) tuple for Claude API call.
+    """
+    user_prompt = BRIEFING_USER_PROMPT.format(
         augment_profile=augment_profile,
         competitor_profiles=competitor_profiles,
         analysis_cards_json=analysis_cards_json,
     )
+    return BRIEFING_SYSTEM_PROMPT, user_prompt
