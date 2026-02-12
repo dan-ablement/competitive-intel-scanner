@@ -11,6 +11,7 @@ from sqlalchemy.orm import Session
 from backend.models.check_run import CheckRun
 from backend.models.feed import RSSFeed
 from backend.models.feed_item import FeedItem
+from backend.services.llm_analyzer import LLMAnalyzer
 
 logger = logging.getLogger(__name__)
 
@@ -20,6 +21,7 @@ class FeedChecker:
 
     def __init__(self, db: Session):
         self.db = db
+        self.analyzer = LLMAnalyzer()
 
     # ------------------------------------------------------------------
     # Public API
@@ -56,9 +58,21 @@ class FeedChecker:
                 errors.append(error_msg)
                 self._record_feed_error(feed, str(exc))
 
+        # Run LLM analysis on unprocessed items
+        cards_generated = 0
+        if new_items_total > 0:
+            try:
+                cards_generated = self.analyzer.process_unprocessed_items(
+                    self.db, check_run_id=check_run.id,
+                )
+            except Exception as exc:
+                logger.exception("LLM analysis phase failed")
+                errors.append(f"LLM analysis: {exc}")
+
         # Finalize check_run
         check_run.feeds_checked = feeds_checked
         check_run.new_items_found = new_items_total
+        check_run.cards_generated = cards_generated
         check_run.completed_at = datetime.now(timezone.utc)
 
         if errors:
