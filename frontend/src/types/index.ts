@@ -12,7 +12,7 @@ export type {
   Priority,
   CardStatus,
 } from "./analysis-card";
-export type { Briefing, BriefingStatus } from "./briefing";
+export type { Briefing, BriefingCard, BriefingStatus } from "./briefing";
 export type { CheckRun, CheckRunStatus } from "./check-run";
 export type {
   ProfileUpdateSuggestion,
