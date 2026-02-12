@@ -8,15 +8,14 @@ from sqlalchemy import engine_from_config, pool
 # Add the repo root to sys.path so we can import backend modules
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", ".."))
 
+from backend.config import settings
 from backend.database import Base
 from backend.models import *  # noqa: F401,F403 — ensure all models are registered
 
 config = context.config
 
-# Override sqlalchemy.url from DATABASE_URL env var if set
-database_url = os.environ.get("DATABASE_URL")
-if database_url:
-    config.set_main_option("sqlalchemy.url", database_url)
+# Override sqlalchemy.url from settings (which reads .env)
+config.set_main_option("sqlalchemy.url", settings.DATABASE_URL)
 
 if config.config_file_name is not None:
     fileConfig(config.config_file_name)
