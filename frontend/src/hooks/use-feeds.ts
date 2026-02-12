@@ -1,5 +1,5 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { listFeeds, createFeed, updateFeed, deleteFeed, testFeed } from "@/api/feeds";
+import { listFeeds, createFeed, updateFeed, deleteFeed, testFeed, testFeedUrl } from "@/api/feeds";
 import type { RssFeed } from "@/types";
 
 export function useFeeds() {
@@ -36,6 +36,12 @@ export function useDeleteFeed() {
 export function useTestFeed() {
   return useMutation({
     mutationFn: testFeed,
+  });
+}
+
+export function useTestFeedUrl() {
+  return useMutation({
+    mutationFn: testFeedUrl,
   });
 }
 
