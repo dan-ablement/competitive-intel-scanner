@@ -8,6 +8,7 @@ import {
   Rss,
   Settings,
   Bell,
+  X,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useCards } from "@/hooks/use-cards";
@@ -44,46 +45,75 @@ function useSidebarBadges(): Record<BadgeKey, number> {
   };
 }
 
-export function Sidebar() {
+interface SidebarProps {
+  open: boolean;
+  onClose: () => void;
+}
+
+export function Sidebar({ open, onClose }: SidebarProps) {
   const badges = useSidebarBadges();
 
   return (
-    <aside className="flex h-full w-60 flex-col border-r border-sidebar-border bg-sidebar">
-      <div className="flex h-14 items-center gap-2 border-b border-sidebar-border px-4">
-        <Bell className="h-5 w-5 text-sidebar-foreground" />
-        <span className="text-lg font-semibold text-sidebar-foreground">
-          CompIntel
-        </span>
-      </div>
-      <nav className="flex-1 space-y-1 p-2">
-        {navItems.map((item) => {
-          const badgeCount = item.badgeKey ? badges[item.badgeKey] : 0;
-          return (
-            <NavLink
-              key={item.to}
-              to={item.to}
-              end={item.to === "/"}
-              className={({ isActive }) =>
-                cn(
-                  "flex items-center gap-3 rounded-md px-3 py-2 text-sm font-medium transition-colors",
-                  isActive
-                    ? "bg-sidebar-accent text-sidebar-accent-foreground"
-                    : "text-sidebar-foreground hover:bg-sidebar-accent/50"
-                )
-              }
-            >
-              <item.icon className="h-4 w-4" />
-              <span className="flex-1">{item.label}</span>
-              {badgeCount > 0 && (
-                <span className="rounded-full bg-primary/20 px-1.5 py-0.5 text-xs font-semibold text-primary">
-                  {badgeCount}
-                </span>
-              )}
-            </NavLink>
-          );
-        })}
-      </nav>
-    </aside>
+    <>
+      {/* Backdrop for mobile */}
+      {open && (
+        <div
+          className="fixed inset-0 z-30 bg-black/40 md:hidden"
+          onClick={onClose}
+        />
+      )}
+
+      <aside
+        className={cn(
+          "fixed inset-y-0 left-0 z-40 flex w-60 flex-col border-r border-sidebar-border bg-sidebar transition-transform duration-200 md:static md:translate-x-0",
+          open ? "translate-x-0" : "-translate-x-full"
+        )}
+      >
+        <div className="flex h-14 items-center justify-between border-b border-sidebar-border px-4">
+          <div className="flex items-center gap-2">
+            <Bell className="h-5 w-5 text-sidebar-foreground" />
+            <span className="text-lg font-semibold text-sidebar-foreground">
+              CompIntel
+            </span>
+          </div>
+          <button
+            onClick={onClose}
+            className="rounded-md p-1 text-sidebar-foreground hover:bg-sidebar-accent md:hidden"
+          >
+            <X className="h-4 w-4" />
+          </button>
+        </div>
+        <nav className="flex-1 space-y-1 overflow-y-auto p-2">
+          {navItems.map((item) => {
+            const badgeCount = item.badgeKey ? badges[item.badgeKey] : 0;
+            return (
+              <NavLink
+                key={item.to}
+                to={item.to}
+                end={item.to === "/"}
+                onClick={onClose}
+                className={({ isActive }) =>
+                  cn(
+                    "flex items-center gap-3 rounded-md px-3 py-2 text-sm font-medium transition-colors",
+                    isActive
+                      ? "bg-sidebar-accent text-sidebar-accent-foreground"
+                      : "text-sidebar-foreground hover:bg-sidebar-accent/50"
+                  )
+                }
+              >
+                <item.icon className="h-4 w-4" />
+                <span className="flex-1">{item.label}</span>
+                {badgeCount > 0 && (
+                  <span className="rounded-full bg-primary/20 px-1.5 py-0.5 text-xs font-semibold text-primary">
+                    {badgeCount}
+                  </span>
+                )}
+              </NavLink>
+            );
+          })}
+        </nav>
+      </aside>
+    </>
   );
 }
 

@@ -2,7 +2,7 @@ import { Link } from "react-router-dom";
 import { useBriefings } from "@/hooks/use-briefings";
 import type { Briefing, BriefingStatus } from "@/types";
 import { cn } from "@/lib/utils";
-import { Loader2, FileText } from "lucide-react";
+import { Loader2, FileText, RefreshCw } from "lucide-react";
 
 // ---------------------------------------------------------------------------
 // Constants
@@ -72,7 +72,7 @@ function BriefingRow({ briefing }: { briefing: Briefing }) {
 // ---------------------------------------------------------------------------
 
 export default function Briefings() {
-  const { data: briefings, isLoading, error } = useBriefings();
+  const { data: briefings, isLoading, error, refetch } = useBriefings();
 
   // Sort by date descending (most recent first)
   const sorted = [...(briefings ?? [])].sort(
@@ -90,7 +90,12 @@ export default function Briefings() {
   if (error) {
     return (
       <div className="rounded-lg border border-destructive/50 bg-destructive/10 p-4 text-destructive">
-        Failed to load briefings.
+        <div className="flex items-center justify-between">
+          <span>Failed to load briefings.</span>
+          <button onClick={() => refetch()} className="inline-flex items-center gap-1.5 rounded-md border border-destructive/30 px-3 py-1.5 text-sm font-medium hover:bg-destructive/10">
+            <RefreshCw className="h-3.5 w-3.5" /> Retry
+          </button>
+        </div>
       </div>
     );
   }

@@ -13,6 +13,7 @@ import {
   Shield,
   Archive,
   CreditCard,
+  RefreshCw,
 } from "lucide-react";
 
 // ---------------------------------------------------------------------------
@@ -206,7 +207,7 @@ function LinkedCards({ cards }: { cards: BriefingCard[] }) {
 export default function BriefingDetail() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
-  const { data: briefing, isLoading, error } = useBriefing(id!);
+  const { data: briefing, isLoading, error, refetch } = useBriefing(id!);
   const updateMutation = useUpdateBriefing();
   const statusMutation = useChangeBriefingStatus();
 
@@ -243,7 +244,12 @@ export default function BriefingDetail() {
   if (error || !briefing) {
     return (
       <div className="rounded-lg border border-destructive/50 bg-destructive/10 p-4 text-destructive">
-        Briefing not found.
+        <div className="flex items-center justify-between">
+          <span>Briefing not found.</span>
+          <button onClick={() => refetch()} className="inline-flex items-center gap-1.5 rounded-md border border-destructive/30 px-3 py-1.5 text-sm font-medium hover:bg-destructive/10">
+            <RefreshCw className="h-3.5 w-3.5" /> Retry
+          </button>
+        </div>
       </div>
     );
   }

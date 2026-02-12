@@ -15,6 +15,7 @@ import {
   XCircle,
   Trash2,
   Sparkles,
+  RefreshCw,
 } from "lucide-react";
 
 const CONTENT_TYPE_OPTIONS = [
@@ -56,7 +57,7 @@ type FormData = {
 export default function CompetitorDetail() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
-  const { data: competitor, isLoading, error } = useCompetitor(id!);
+  const { data: competitor, isLoading, error, refetch } = useCompetitor(id!);
   const updateMutation = useUpdateCompetitor();
   const deleteMutation = useDeleteCompetitor();
   const approveMutation = useApproveCompetitor();
@@ -137,7 +138,12 @@ export default function CompetitorDetail() {
   if (error || !competitor) {
     return (
       <div className="rounded-lg border border-destructive/50 bg-destructive/10 p-4 text-destructive">
-        Competitor not found.
+        <div className="flex items-center justify-between">
+          <span>Competitor not found.</span>
+          <button onClick={() => refetch()} className="inline-flex items-center gap-1.5 rounded-md border border-destructive/30 px-3 py-1.5 text-sm font-medium hover:bg-destructive/10">
+            <RefreshCw className="h-3.5 w-3.5" /> Retry
+          </button>
+        </div>
       </div>
     );
   }

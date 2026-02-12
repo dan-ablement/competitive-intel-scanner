@@ -22,6 +22,7 @@ import {
   AlertTriangle,
   Rss,
   ExternalLink,
+  RefreshCw,
 } from "lucide-react";
 
 // ---------------------------------------------------------------------------
@@ -374,7 +375,7 @@ function FeedRow({ feed, onEdit }: FeedRowProps) {
 // ---------------------------------------------------------------------------
 
 export default function Feeds() {
-  const { data: feeds, isLoading, error } = useFeeds();
+  const { data: feeds, isLoading, error, refetch } = useFeeds();
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editingFeed, setEditingFeed] = useState<RssFeed | null>(null);
 
@@ -421,7 +422,12 @@ export default function Feeds() {
       {/* Error */}
       {error && (
         <div className="mt-6 rounded-md bg-red-50 px-4 py-3 text-sm text-red-700">
-          Failed to load feeds. Please try again.
+          <div className="flex items-center justify-between">
+            <span>Failed to load feeds.</span>
+            <button onClick={() => refetch()} className="inline-flex items-center gap-1.5 rounded-md border border-red-300 px-3 py-1.5 text-sm font-medium hover:bg-red-100">
+              <RefreshCw className="h-3.5 w-3.5" /> Retry
+            </button>
+          </div>
         </div>
       )}
 

@@ -18,6 +18,7 @@ import {
   Users,
   Lightbulb,
   Eye,
+  RefreshCw,
 } from "lucide-react";
 
 // ---------------------------------------------------------------------------
@@ -396,18 +397,38 @@ function RecentCardsSection({ cards }: { cards: AnalysisCard[] }) {
 // ---------------------------------------------------------------------------
 
 export default function Dashboard() {
-  const { data: cards, isLoading: cardsLoading } = useCards();
-  const { data: briefings, isLoading: briefingsLoading } = useBriefings();
-  const { data: checkRuns, isLoading: checkRunsLoading } = useCheckRuns();
-  const { data: suggestions, isLoading: suggestionsLoading } = useSuggestions();
-  const { data: suggestedCompetitors, isLoading: competitorsLoading } = useCompetitors({ is_suggested: true });
+  const cardsQuery = useCards();
+  const briefingsQuery = useBriefings();
+  const checkRunsQuery = useCheckRuns();
+  const suggestionsQuery = useSuggestions();
+  const competitorsQuery = useCompetitors({ is_suggested: true });
 
-  const isLoading = cardsLoading || briefingsLoading || checkRunsLoading || suggestionsLoading || competitorsLoading;
+  const cards = cardsQuery.data;
+  const briefings = briefingsQuery.data;
+  const checkRuns = checkRunsQuery.data;
+  const suggestions = suggestionsQuery.data;
+  const suggestedCompetitors = competitorsQuery.data;
+
+  const isLoading = cardsQuery.isLoading || briefingsQuery.isLoading || checkRunsQuery.isLoading || suggestionsQuery.isLoading || competitorsQuery.isLoading;
+  const hasError = cardsQuery.error || briefingsQuery.error || checkRunsQuery.error;
 
   if (isLoading) {
     return (
       <div className="flex items-center justify-center py-20">
         <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+      </div>
+    );
+  }
+
+  if (hasError) {
+    return (
+      <div className="rounded-lg border border-destructive/50 bg-destructive/10 p-4 text-destructive">
+        <div className="flex items-center justify-between">
+          <span>Failed to load dashboard data.</span>
+          <button onClick={() => { cardsQuery.refetch(); briefingsQuery.refetch(); checkRunsQuery.refetch(); }} className="inline-flex items-center gap-1.5 rounded-md border border-destructive/30 px-3 py-1.5 text-sm font-medium hover:bg-destructive/10">
+            <RefreshCw className="h-3.5 w-3.5" /> Retry
+          </button>
+        </div>
       </div>
     );
   }

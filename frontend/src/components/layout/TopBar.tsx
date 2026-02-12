@@ -1,8 +1,12 @@
-import { Bell, LogOut, User } from "lucide-react";
+import { Bell, LogOut, User, Menu } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
 import { useCards } from "@/hooks/use-cards";
 
-export function TopBar() {
+interface TopBarProps {
+  onMenuClick?: () => void;
+}
+
+export function TopBar({ onMenuClick }: TopBarProps) {
   const { user, logout, isLoggingOut } = useAuth();
   const { data: cards } = useCards();
 
@@ -14,7 +18,13 @@ export function TopBar() {
 
   return (
     <header className="flex h-14 items-center justify-between border-b border-border bg-background px-6">
-      <div />
+      <button
+        onClick={onMenuClick}
+        className="rounded-md p-2 text-muted-foreground hover:bg-muted md:hidden"
+      >
+        <Menu className="h-5 w-5" />
+      </button>
+      <div className="hidden md:block" />
       <div className="flex items-center gap-4">
         {/* Red-priority notification indicator */}
         <button className="relative rounded-md p-2 text-muted-foreground hover:bg-muted">

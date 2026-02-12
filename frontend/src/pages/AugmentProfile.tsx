@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { useAugmentProfile, useUpdateAugmentProfile } from "@/hooks/use-augment-profile";
-import { Save, Loader2, CheckCircle2 } from "lucide-react";
+import { Save, Loader2, CheckCircle2, RefreshCw } from "lucide-react";
 
 const FIELDS = [
   { key: "company_description", label: "Company Description", placeholder: "Describe Augment Code's mission, products, and market position..." },
@@ -13,7 +13,7 @@ const FIELDS = [
 type FieldKey = (typeof FIELDS)[number]["key"] | "pricing";
 
 export default function AugmentProfile() {
-  const { data: profile, isLoading, error } = useAugmentProfile();
+  const { data: profile, isLoading, error, refetch } = useAugmentProfile();
   const updateMutation = useUpdateAugmentProfile();
   const [form, setForm] = useState<Record<FieldKey, string>>({
     company_description: "",
@@ -56,7 +56,12 @@ export default function AugmentProfile() {
   if (error) {
     return (
       <div className="rounded-lg border border-destructive/50 bg-destructive/10 p-4 text-destructive">
-        Failed to load profile. Please try again.
+        <div className="flex items-center justify-between">
+          <span>Failed to load profile.</span>
+          <button onClick={() => refetch()} className="inline-flex items-center gap-1.5 rounded-md border border-destructive/30 px-3 py-1.5 text-sm font-medium hover:bg-destructive/10">
+            <RefreshCw className="h-3.5 w-3.5" /> Retry
+          </button>
+        </div>
       </div>
     );
   }

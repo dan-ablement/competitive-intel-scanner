@@ -207,7 +207,7 @@ function SuggestionCard({ suggestion }: { suggestion: ProfileUpdateSuggestion })
 // ---------------------------------------------------------------------------
 
 function SuggestionsSection() {
-  const { data: suggestions, isLoading, error } = useSuggestions();
+  const { data: suggestions, isLoading, error, refetch } = useSuggestions();
   const triggerReview = useTriggerProfileReview();
   const [filter, setFilter] = useState<"all" | "competitor" | "augment">("all");
 
@@ -263,7 +263,12 @@ function SuggestionsSection() {
 
       {error && (
         <div className="rounded-md bg-red-50 px-4 py-3 text-sm text-red-700">
-          Failed to load suggestions.
+          <div className="flex items-center justify-between">
+            <span>Failed to load suggestions.</span>
+            <button onClick={() => refetch()} className="inline-flex items-center gap-1.5 rounded-md border border-red-300 px-3 py-1.5 text-sm font-medium hover:bg-red-100">
+              <RefreshCw className="h-3.5 w-3.5" /> Retry
+            </button>
+          </div>
         </div>
       )}
 

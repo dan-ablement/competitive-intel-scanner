@@ -10,6 +10,7 @@ import {
   CheckCircle2,
   ExternalLink,
   ChevronDown,
+  RefreshCw,
 } from "lucide-react";
 import { CommentsPanel, EditHistory, ApprovalWorkflow } from "@/components/cards";
 
@@ -56,7 +57,7 @@ interface CardForm {
 export default function CardDetail() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
-  const { data: card, isLoading, error } = useCard(id!);
+  const { data: card, isLoading, error, refetch } = useCard(id!);
   const updateMutation = useUpdateCard();
   const statusMutation = useChangeCardStatus();
 
@@ -108,7 +109,12 @@ export default function CardDetail() {
   if (error || !card) {
     return (
       <div className="rounded-lg border border-destructive/50 bg-destructive/10 p-4 text-destructive">
-        Analysis card not found.
+        <div className="flex items-center justify-between">
+          <span>Analysis card not found.</span>
+          <button onClick={() => refetch()} className="inline-flex items-center gap-1.5 rounded-md border border-destructive/30 px-3 py-1.5 text-sm font-medium hover:bg-destructive/10">
+            <RefreshCw className="h-3.5 w-3.5" /> Retry
+          </button>
+        </div>
       </div>
     );
   }
