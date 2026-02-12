@@ -1,7 +1,7 @@
 import { useState, useEffect } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { useCard, useUpdateCard, useChangeCardStatus } from "@/hooks/use-cards";
-import type { CardStatus, Priority, EventType } from "@/types";
+import type { AnalysisCard, CardStatus, Priority, EventType } from "@/types";
 import { cn } from "@/lib/utils";
 import {
   ArrowLeft,
@@ -9,7 +9,9 @@ import {
   Loader2,
   CheckCircle2,
   ExternalLink,
+  ChevronDown,
 } from "lucide-react";
+import { CommentsPanel, EditHistory, ApprovalWorkflow } from "@/components/cards";
 
 // ---------------------------------------------------------------------------
 // Constants
@@ -28,43 +30,11 @@ const EVENT_TYPE_OPTIONS: { value: EventType; label: string }[] = [
   { value: "other", label: "Other" },
 ];
 
-const STATUS_OPTIONS: { value: CardStatus; label: string }[] = [
-  { value: "draft", label: "Draft" },
-  { value: "in_review", label: "In Review" },
-  { value: "approved", label: "Approved" },
-  { value: "archived", label: "Archived" },
-];
-
 const PRIORITY_CONFIG: { value: Priority; label: string; letter: string; bg: string; ring: string; dot: string }[] = [
   { value: "red", label: "Red — Urgent", letter: "R", bg: "bg-red-100 text-red-800 border-red-300", ring: "ring-red-400", dot: "bg-red-500" },
   { value: "yellow", label: "Yellow — Warning", letter: "Y", bg: "bg-amber-100 text-amber-800 border-amber-300", ring: "ring-amber-400", dot: "bg-amber-400" },
   { value: "green", label: "Green — Info", letter: "G", bg: "bg-green-100 text-green-800 border-green-300", ring: "ring-green-400", dot: "bg-green-500" },
 ];
-
-// ---------------------------------------------------------------------------
-// Helper components
-// ---------------------------------------------------------------------------
-
-function StatusBadge({ status }: { status: CardStatus }) {
-  const config: Record<CardStatus, string> = {
-    draft: "bg-gray-100 text-gray-700 border-gray-200",
-    in_review: "bg-blue-100 text-blue-700 border-blue-200",
-    approved: "bg-green-100 text-green-700 border-green-200",
-    archived: "bg-muted text-muted-foreground border-border",
-  };
-  const labels: Record<CardStatus, string> = {
-    draft: "Draft",
-    in_review: "In Review",
-    approved: "Approved",
-    archived: "Archived",
-  };
-
-  return (
-    <span className={cn("inline-flex rounded-full border px-2.5 py-1 text-xs font-medium", config[status])}>
-      {labels[status]}
-    </span>
-  );
-}
 
 // ---------------------------------------------------------------------------
 // Form type
@@ -91,6 +61,7 @@ export default function CardDetail() {
   const statusMutation = useChangeCardStatus();
 
   const [saved, setSaved] = useState(false);
+  const [historyOpen, setHistoryOpen] = useState(false);
   const [form, setForm] = useState<CardForm>({
     title: "",
     summary: "",
@@ -227,6 +198,23 @@ export default function CardDetail() {
               Failed to save changes. Please try again.
             </div>
           )}
+
+          {/* Edit History (collapsible) */}
+          <div className="rounded-lg border border-border">
+            <button
+              onClick={() => setHistoryOpen((prev) => !prev)}
+              className="flex w-full items-center justify-between px-4 py-3 text-sm font-medium hover:bg-muted/50"
+            >
+              Edit History
+              <ChevronDown
+                className={cn(
+                  "h-4 w-4 text-muted-foreground transition-transform",
+                  historyOpen && "rotate-180"
+                )}
+              />
+            </button>
+            {historyOpen && <EditHistory cardId={id!} />}
+          </div>
         </div>
 
         {/* Sidebar */}
@@ -256,22 +244,14 @@ export default function CardDetail() {
             </p>
           </div>
 
-          {/* Status */}
+          {/* Approval Workflow */}
           <div className="rounded-lg border border-border bg-card p-4">
-            <label className="mb-2 block text-sm font-medium">Status</label>
-            <div className="mb-2">
-              <StatusBadge status={card.status} />
-            </div>
-            <select
-              value={card.status}
-              onChange={(e) => handleStatusChange(e.target.value as CardStatus)}
-              disabled={statusMutation.isPending}
-              className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-ring disabled:opacity-50"
-            >
-              {STATUS_OPTIONS.map((s) => (
-                <option key={s.value} value={s.value}>{s.label}</option>
-              ))}
-            </select>
+            <label className="mb-3 block text-sm font-medium">Status</label>
+            <ApprovalWorkflow
+              card={card as AnalysisCard}
+              onStatusChange={handleStatusChange}
+              isUpdating={statusMutation.isPending}
+            />
           </div>
 
           {/* Event Type */}
@@ -335,6 +315,11 @@ export default function CardDetail() {
                 </div>
               )}
             </dl>
+          </div>
+
+          {/* Comments Panel */}
+          <div className="rounded-lg border border-border bg-card">
+            <CommentsPanel cardId={id!} />
           </div>
         </div>
       </div>
