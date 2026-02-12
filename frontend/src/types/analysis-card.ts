@@ -14,6 +14,11 @@ export type Priority = "red" | "yellow" | "green";
 
 export type CardStatus = "draft" | "in_review" | "approved" | "archived";
 
+export interface CompetitorBrief {
+  id: string;
+  name: string;
+}
+
 export interface AnalysisCard {
   id: string;
   feed_item_id: string | null;
@@ -27,8 +32,8 @@ export interface AnalysisCard {
   status: CardStatus;
   approved_by: string | null;
   approved_at: string | null;
-  check_run_id: string;
-  competitor_ids: string[];
+  check_run_id: string | null;
+  competitors: CompetitorBrief[];
   created_at: string;
   updated_at: string;
 }

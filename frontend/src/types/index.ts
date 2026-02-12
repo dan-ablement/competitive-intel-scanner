@@ -7,6 +7,7 @@ export type {
   AnalysisCard,
   AnalysisCardEdit,
   AnalysisCardComment,
+  CompetitorBrief,
   EventType,
   Priority,
   CardStatus,
