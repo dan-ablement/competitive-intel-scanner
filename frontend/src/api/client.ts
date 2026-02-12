@@ -13,8 +13,13 @@ apiClient.interceptors.response.use(
   (response) => response,
   (error) => {
     if (error.response?.status === 401) {
-      // Redirect to login on auth failure
-      window.location.href = "/login";
+      // Skip redirect if already on the login page (avoids infinite reload loop)
+      // or if the request was to /auth/me (AuthProvider handles that gracefully)
+      const isLoginPage = window.location.pathname === "/login";
+      const isAuthMeRequest = error.config?.url === "/auth/me";
+      if (!isLoginPage && !isAuthMeRequest) {
+        window.location.href = "/login";
+      }
     }
     return Promise.reject(error);
   }
