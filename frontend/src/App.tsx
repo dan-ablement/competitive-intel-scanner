@@ -1,5 +1,7 @@
 import { BrowserRouter, Routes, Route } from "react-router-dom";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import { AuthProvider } from "@/contexts/AuthContext";
+import { ProtectedRoute } from "@/components/common/ProtectedRoute";
 import { AppLayout } from "@/components/layout";
 import Dashboard from "@/pages/Dashboard";
 import Cards from "@/pages/Cards";
@@ -26,21 +28,25 @@ function App() {
   return (
     <QueryClientProvider client={queryClient}>
       <BrowserRouter>
-        <Routes>
-          <Route path="/login" element={<Login />} />
-          <Route element={<AppLayout />}>
-            <Route index element={<Dashboard />} />
-            <Route path="cards" element={<Cards />} />
-            <Route path="cards/:id" element={<CardDetail />} />
-            <Route path="briefings" element={<Briefings />} />
-            <Route path="briefings/:id" element={<BriefingDetail />} />
-            <Route path="competitors" element={<Competitors />} />
-            <Route path="competitors/:id" element={<CompetitorDetail />} />
-            <Route path="augment-profile" element={<AugmentProfile />} />
-            <Route path="feeds" element={<Feeds />} />
-            <Route path="settings" element={<Settings />} />
-          </Route>
-        </Routes>
+        <AuthProvider>
+          <Routes>
+            <Route path="/login" element={<Login />} />
+            <Route element={<ProtectedRoute />}>
+              <Route element={<AppLayout />}>
+                <Route index element={<Dashboard />} />
+                <Route path="cards" element={<Cards />} />
+                <Route path="cards/:id" element={<CardDetail />} />
+                <Route path="briefings" element={<Briefings />} />
+                <Route path="briefings/:id" element={<BriefingDetail />} />
+                <Route path="competitors" element={<Competitors />} />
+                <Route path="competitors/:id" element={<CompetitorDetail />} />
+                <Route path="augment-profile" element={<AugmentProfile />} />
+                <Route path="feeds" element={<Feeds />} />
+                <Route path="settings" element={<Settings />} />
+              </Route>
+            </Route>
+          </Routes>
+        </AuthProvider>
       </BrowserRouter>
     </QueryClientProvider>
   );

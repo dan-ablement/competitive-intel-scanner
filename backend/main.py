@@ -1,10 +1,15 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
+from starlette.middleware.sessions import SessionMiddleware
 
+from backend.config import settings
 from backend.routes import auth, feeds, competitors, augment_profile, cards, briefings, suggestions, system
 
 app = FastAPI(title="Competitive Intelligence Scanner")
+
+# Session middleware — must be added before CORS so sessions work on all routes
+app.add_middleware(SessionMiddleware, secret_key=settings.SESSION_SECRET)
 
 app.add_middleware(
     CORSMiddleware,
