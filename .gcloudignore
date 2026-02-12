@@ -1,0 +1,18 @@
+# Ignore node_modules - npm ci runs inside Docker build
+frontend/node_modules/
+node_modules/
+
+# Python caches
+__pycache__/
+*.pyc
+*.pyo
+
+# Local dev files
+.git/
+.env
+.env.*
+docker-compose.yml
+*.md
+.vscode/
+.idea/
+
