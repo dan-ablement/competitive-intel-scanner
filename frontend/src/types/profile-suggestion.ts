@@ -6,6 +6,7 @@ export interface ProfileUpdateSuggestion {
   id: string;
   target_type: SuggestionTargetType;
   competitor_id: string | null;
+  competitor_name: string | null;
   field: string;
   current_value: string;
   suggested_value: string;
