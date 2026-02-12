@@ -1,17 +1,29 @@
 import { Bell, LogOut, User } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
+import { useCards } from "@/hooks/use-cards";
 
 export function TopBar() {
   const { user, logout, isLoggingOut } = useAuth();
+  const { data: cards } = useCards();
+
+  // Count red-priority cards from the last 24 hours
+  const oneDayAgo = Date.now() - 24 * 60 * 60 * 1000;
+  const redCount = (cards ?? []).filter(
+    (c) => c.priority === "red" && new Date(c.created_at).getTime() >= oneDayAgo
+  ).length;
 
   return (
     <header className="flex h-14 items-center justify-between border-b border-border bg-background px-6">
       <div />
       <div className="flex items-center gap-4">
-        {/* Notification indicator placeholder */}
+        {/* Red-priority notification indicator */}
         <button className="relative rounded-md p-2 text-muted-foreground hover:bg-muted">
           <Bell className="h-5 w-5" />
-          <span className="absolute right-1 top-1 h-2 w-2 rounded-full bg-destructive" />
+          {redCount > 0 && (
+            <span className="absolute -right-0.5 -top-0.5 flex h-4 min-w-4 items-center justify-center rounded-full bg-destructive px-1 text-[10px] font-bold text-destructive-foreground">
+              {redCount > 99 ? "99+" : redCount}
+            </span>
+          )}
         </button>
         {/* User info and logout */}
         {user && (
