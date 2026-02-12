@@ -1,4 +1,5 @@
 import logging
+import os
 
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
@@ -42,5 +43,6 @@ app.include_router(briefings.router, prefix="/api/briefings", tags=["briefings"]
 app.include_router(suggestions.router, prefix="/api/suggestions", tags=["suggestions"])
 app.include_router(system.router, prefix="/api", tags=["system"])
 
-app.mount("/", StaticFiles(directory="./static", html=True), name="static")
+if os.path.isdir("./static"):
+    app.mount("/", StaticFiles(directory="./static", html=True), name="static")
 
