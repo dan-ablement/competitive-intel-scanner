@@ -19,28 +19,13 @@ depends_on: Union[str, Sequence[str], None] = None
 
 
 def upgrade() -> None:
-    # Enum types
-    op.execute("CREATE TYPE user_role AS ENUM ('admin', 'reviewer', 'viewer')")
-    op.execute(
-        "CREATE TYPE event_type AS ENUM ("
-        "'new_feature', 'product_announcement', 'partnership', 'acquisition', "
-        "'acquired', 'funding', 'pricing_change', 'leadership_change', 'expansion', 'other')"
-    )
-    op.execute("CREATE TYPE priority_level AS ENUM ('red', 'yellow', 'green')")
-    op.execute("CREATE TYPE card_status AS ENUM ('draft', 'in_review', 'approved', 'archived')")
-    op.execute("CREATE TYPE briefing_status AS ENUM ('draft', 'in_review', 'approved', 'archived')")
-    op.execute("CREATE TYPE check_run_status AS ENUM ('running', 'completed', 'failed')")
-    op.execute("CREATE TYPE suggestion_target_type AS ENUM ('competitor', 'augment')")
-    op.execute("CREATE TYPE suggestion_status AS ENUM ('pending', 'approved', 'rejected')")
-    op.execute("CREATE TYPE content_output_status AS ENUM ('draft', 'approved', 'published')")
-
     # users
     op.create_table(
         "users",
         sa.Column("id", postgresql.UUID(as_uuid=True), primary_key=True),
         sa.Column("email", sa.String(), unique=True, nullable=False),
         sa.Column("name", sa.String(), nullable=False),
-        sa.Column("role", sa.Enum("admin", "reviewer", "viewer", name="user_role", create_type=False), nullable=False, server_default="viewer"),
+        sa.Column("role", sa.Enum("admin", "reviewer", "viewer", name="user_role"), nullable=False, server_default="viewer"),
         sa.Column("google_id", sa.String(), unique=True, nullable=False),
         sa.Column("created_at", sa.DateTime(), nullable=False, server_default=sa.func.now()),
         sa.Column("updated_at", sa.DateTime(), nullable=False, server_default=sa.func.now()),
@@ -124,7 +109,7 @@ def upgrade() -> None:
         sa.Column("scheduled_time", sa.DateTime(), nullable=False),
         sa.Column("started_at", sa.DateTime(), nullable=False),
         sa.Column("completed_at", sa.DateTime(), nullable=True),
-        sa.Column("status", sa.Enum("running", "completed", "failed", name="check_run_status", create_type=False), nullable=False),
+        sa.Column("status", sa.Enum("running", "completed", "failed", name="check_run_status"), nullable=False),
         sa.Column("feeds_checked", sa.Integer(), nullable=False, server_default="0"),
         sa.Column("new_items_found", sa.Integer(), nullable=False, server_default="0"),
         sa.Column("cards_generated", sa.Integer(), nullable=False, server_default="0"),
@@ -140,15 +125,15 @@ def upgrade() -> None:
         sa.Column("event_type", sa.Enum(
             "new_feature", "product_announcement", "partnership", "acquisition",
             "acquired", "funding", "pricing_change", "leadership_change", "expansion", "other",
-            name="event_type", create_type=False,
+            name="event_type",
         ), nullable=False),
-        sa.Column("priority", sa.Enum("red", "yellow", "green", name="priority_level", create_type=False), nullable=False),
+        sa.Column("priority", sa.Enum("red", "yellow", "green", name="priority_level"), nullable=False),
         sa.Column("title", sa.String(), nullable=False),
         sa.Column("summary", sa.Text(), nullable=False),
         sa.Column("impact_assessment", sa.Text(), nullable=False),
         sa.Column("suggested_counter_moves", sa.Text(), nullable=False),
         sa.Column("raw_llm_output", postgresql.JSONB(), nullable=True),
-        sa.Column("status", sa.Enum("draft", "in_review", "approved", "archived", name="card_status", create_type=False), nullable=False, server_default="draft"),
+        sa.Column("status", sa.Enum("draft", "in_review", "approved", "archived", name="card_status"), nullable=False, server_default="draft"),
         sa.Column("approved_by", postgresql.UUID(as_uuid=True), sa.ForeignKey("users.id"), nullable=True),
         sa.Column("approved_at", sa.DateTime(), nullable=True),
         sa.Column("check_run_id", postgresql.UUID(as_uuid=True), sa.ForeignKey("check_runs.id"), nullable=True),
@@ -195,7 +180,7 @@ def upgrade() -> None:
         sa.Column("date", sa.Date(), unique=True, nullable=False),
         sa.Column("content", sa.Text(), nullable=False),
         sa.Column("raw_llm_output", postgresql.JSONB(), nullable=True),
-        sa.Column("status", sa.Enum("draft", "in_review", "approved", "archived", name="briefing_status", create_type=False), nullable=False, server_default="draft"),
+        sa.Column("status", sa.Enum("draft", "in_review", "approved", "archived", name="briefing_status"), nullable=False, server_default="draft"),
         sa.Column("approved_by", postgresql.UUID(as_uuid=True), sa.ForeignKey("users.id"), nullable=True),
         sa.Column("approved_at", sa.DateTime(), nullable=True),
         sa.Column("created_at", sa.DateTime(), nullable=False, server_default=sa.func.now()),
@@ -213,14 +198,14 @@ def upgrade() -> None:
     op.create_table(
         "profile_update_suggestions",
         sa.Column("id", postgresql.UUID(as_uuid=True), primary_key=True),
-        sa.Column("target_type", sa.Enum("competitor", "augment", name="suggestion_target_type", create_type=False), nullable=False),
+        sa.Column("target_type", sa.Enum("competitor", "augment", name="suggestion_target_type"), nullable=False),
         sa.Column("competitor_id", postgresql.UUID(as_uuid=True), sa.ForeignKey("competitors.id"), nullable=True),
         sa.Column("field", sa.String(), nullable=False),
         sa.Column("current_value", sa.Text(), nullable=False),
         sa.Column("suggested_value", sa.Text(), nullable=False),
         sa.Column("reason", sa.Text(), nullable=False),
         sa.Column("source_card_ids", postgresql.JSONB(), nullable=True),
-        sa.Column("status", sa.Enum("pending", "approved", "rejected", name="suggestion_status", create_type=False), nullable=False, server_default="pending"),
+        sa.Column("status", sa.Enum("pending", "approved", "rejected", name="suggestion_status"), nullable=False, server_default="pending"),
         sa.Column("reviewed_by", postgresql.UUID(as_uuid=True), sa.ForeignKey("users.id"), nullable=True),
         sa.Column("reviewed_at", sa.DateTime(), nullable=True),
         sa.Column("created_at", sa.DateTime(), nullable=False, server_default=sa.func.now()),
@@ -235,7 +220,7 @@ def upgrade() -> None:
         sa.Column("content", sa.Text(), nullable=False),
         sa.Column("source_card_ids", postgresql.JSONB(), nullable=True),
         sa.Column("version", sa.Integer(), nullable=False, server_default="1"),
-        sa.Column("status", sa.Enum("draft", "approved", "published", name="content_output_status", create_type=False), nullable=False, server_default="draft"),
+        sa.Column("status", sa.Enum("draft", "approved", "published", name="content_output_status"), nullable=False, server_default="draft"),
         sa.Column("created_at", sa.DateTime(), nullable=False, server_default=sa.func.now()),
         sa.Column("updated_at", sa.DateTime(), nullable=False, server_default=sa.func.now()),
     )
