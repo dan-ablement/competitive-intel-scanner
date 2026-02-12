@@ -24,8 +24,10 @@ export function useUpdateSettings() {
 }
 
 export function useTriggerFeedCheck() {
+  const queryClient = useQueryClient();
   return useMutation({
     mutationFn: triggerFeedCheck,
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["check-runs"] }),
   });
 }
 

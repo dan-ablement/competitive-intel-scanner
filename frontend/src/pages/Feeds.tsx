@@ -8,6 +8,7 @@ import {
   useTestFeedUrl,
 } from "@/hooks/use-feeds";
 import { useCompetitors } from "@/hooks/use-competitors";
+import { CheckRunsHistory } from "@/components/common/CheckRunsHistory";
 import type { RssFeed } from "@/types";
 import type { TestFeedResult } from "@/api/feeds";
 import { cn } from "@/lib/utils";
@@ -455,6 +456,9 @@ export default function Feeds() {
           </table>
         </div>
       )}
+
+      {/* Check Run History */}
+      <CheckRunsHistory />
 
       {/* Dialog */}
       <FeedFormDialog

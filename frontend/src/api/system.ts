@@ -1,8 +1,8 @@
 import { apiClient } from "./client";
 import type { CheckRun } from "@/types";
 
-export async function triggerFeedCheck(): Promise<{ message: string }> {
-  const { data } = await apiClient.post<{ message: string }>("/check-feeds");
+export async function triggerFeedCheck(): Promise<CheckRun> {
+  const { data } = await apiClient.post<CheckRun>("/check-feeds");
   return data;
 }
 
