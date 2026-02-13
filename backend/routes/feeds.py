@@ -5,13 +5,15 @@ from datetime import datetime
 from typing import Optional
 
 import feedparser
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Request
 from pydantic import BaseModel, HttpUrl
 from sqlalchemy.orm import Session, joinedload
 
 from backend.database import get_db
 from backend.models.feed import RSSFeed
 from backend.models.competitor import Competitor
+from backend.models.user import User
+from backend.routes.auth import get_current_user
 
 router = APIRouter()
 
@@ -79,9 +81,6 @@ def _feed_to_response(feed: RSSFeed) -> dict:
     }
 
 
-# Placeholder: in production this comes from auth middleware / session
-_PLACEHOLDER_USER_ID = uuid.UUID("00000000-0000-0000-0000-000000000001")
-
 
 # ---------------------------------------------------------------------------
 # Routes
@@ -100,7 +99,7 @@ def list_feeds(db: Session = Depends(get_db)):
 
 
 @router.post("", response_model=FeedResponse, status_code=201)
-def create_feed(body: FeedCreate, db: Session = Depends(get_db)):
+def create_feed(body: FeedCreate, request: Request, db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
     """Create a new RSS feed."""
     # Check for duplicate URL
     existing = db.query(RSSFeed).filter(RSSFeed.url == body.url).first()
@@ -122,7 +121,7 @@ def create_feed(body: FeedCreate, db: Session = Depends(get_db)):
         competitor_id=competitor_id_val,
         is_active=True,
         error_count=0,
-        created_by=_PLACEHOLDER_USER_ID,
+        created_by=current_user.id,
     )
     db.add(feed)
     db.commit()
