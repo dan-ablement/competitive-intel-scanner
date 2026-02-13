@@ -31,8 +31,14 @@ export async function testFeed(id: string): Promise<TestFeedResult> {
   return data;
 }
 
-export async function testFeedUrl(url: string): Promise<TestFeedResult> {
-  const { data } = await apiClient.post<TestFeedResult>("/feeds/test-url", { url });
+export interface TestFeedUrlPayload {
+  url: string;
+  feed_type?: 'rss' | 'web_scrape';
+  css_selector?: string | null;
+}
+
+export async function testFeedUrl(payload: TestFeedUrlPayload): Promise<TestFeedResult> {
+  const { data } = await apiClient.post<TestFeedResult>("/feeds/test-url", payload);
   return data;
 }
 

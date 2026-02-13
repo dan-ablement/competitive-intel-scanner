@@ -21,6 +21,7 @@ import {
   XCircle,
   AlertTriangle,
   Rss,
+  Globe,
   ExternalLink,
   RefreshCw,
 } from "lucide-react";
@@ -39,8 +40,12 @@ function FeedFormDialog({ open, onClose, feed }: FeedFormProps) {
   const isEdit = !!feed;
   const [name, setName] = useState(feed?.name ?? "");
   const [url, setUrl] = useState(feed?.url ?? "");
+  const [feedType, setFeedType] = useState<'rss' | 'web_scrape'>(feed?.feed_type ?? "rss");
+  const [cssSelector, setCssSelector] = useState(feed?.css_selector ?? "");
   const [competitorId, setCompetitorId] = useState(feed?.competitor_id ?? "");
   const [testResult, setTestResult] = useState<TestFeedResult | null>(null);
+
+  const isWebScrape = feedType === "web_scrape";
 
   const { data: competitors } = useCompetitors();
   const createFeed = useCreateFeed();
@@ -53,11 +58,14 @@ function FeedFormDialog({ open, onClose, feed }: FeedFormProps) {
   function handleTest() {
     if (!url) return;
     setTestResult(null);
-    testFeedUrl.mutate(url, {
-      onSuccess: (result) => setTestResult(result),
-      onError: () =>
-        setTestResult({ success: false, message: "Network error testing feed.", item_count: 0 }),
-    });
+    testFeedUrl.mutate(
+      { url, feed_type: feedType, css_selector: cssSelector || null },
+      {
+        onSuccess: (result) => setTestResult(result),
+        onError: () =>
+          setTestResult({ success: false, message: "Network error testing feed.", item_count: 0 }),
+      },
+    );
   }
 
   function handleSubmit(e: React.FormEvent) {
@@ -65,6 +73,8 @@ function FeedFormDialog({ open, onClose, feed }: FeedFormProps) {
     const payload = {
       name,
       url,
+      feed_type: feedType,
+      css_selector: cssSelector || null,
       competitor_id: competitorId || null,
     };
 
@@ -88,6 +98,39 @@ function FeedFormDialog({ open, onClose, feed }: FeedFormProps) {
         <h2 className="text-lg font-semibold">{isEdit ? "Edit Feed" : "Add Feed"}</h2>
 
         <form onSubmit={handleSubmit} className="mt-4 space-y-4">
+          {/* Source Type */}
+          <div>
+            <label className="mb-1 block text-sm font-medium">Source Type</label>
+            <div className="flex gap-1 rounded-md border border-input p-1">
+              <button
+                type="button"
+                onClick={() => setFeedType("rss")}
+                className={cn(
+                  "flex-1 inline-flex items-center justify-center gap-1.5 rounded px-3 py-1.5 text-sm font-medium transition-colors",
+                  feedType === "rss"
+                    ? "bg-primary text-primary-foreground"
+                    : "text-muted-foreground hover:bg-accent hover:text-foreground",
+                )}
+              >
+                <Rss className="h-3.5 w-3.5" />
+                RSS Feed
+              </button>
+              <button
+                type="button"
+                onClick={() => setFeedType("web_scrape")}
+                className={cn(
+                  "flex-1 inline-flex items-center justify-center gap-1.5 rounded px-3 py-1.5 text-sm font-medium transition-colors",
+                  feedType === "web_scrape"
+                    ? "bg-primary text-primary-foreground"
+                    : "text-muted-foreground hover:bg-accent hover:text-foreground",
+                )}
+              >
+                <Globe className="h-3.5 w-3.5" />
+                Web Scrape
+              </button>
+            </div>
+          </div>
+
           {/* Name */}
           <div>
             <label className="mb-1 block text-sm font-medium">Name</label>
@@ -102,13 +145,15 @@ function FeedFormDialog({ open, onClose, feed }: FeedFormProps) {
 
           {/* URL + Test */}
           <div>
-            <label className="mb-1 block text-sm font-medium">Feed URL</label>
+            <label className="mb-1 block text-sm font-medium">
+              {isWebScrape ? "Page URL" : "Feed URL"}
+            </label>
             <div className="flex gap-2">
               <input
                 className="flex-1 rounded-md border border-input bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-ring"
                 value={url}
                 onChange={(e) => { setUrl(e.target.value); setTestResult(null); }}
-                placeholder="https://example.com/feed.xml"
+                placeholder={isWebScrape ? "https://example.com/blog" : "https://example.com/feed.xml"}
                 required
               />
               <button
@@ -118,7 +163,7 @@ function FeedFormDialog({ open, onClose, feed }: FeedFormProps) {
                 className="inline-flex items-center gap-1.5 rounded-md border border-input bg-secondary px-3 py-2 text-sm font-medium hover:bg-accent disabled:opacity-50"
               >
                 {isTesting ? <Loader2 className="h-4 w-4 animate-spin" /> : <FlaskConical className="h-4 w-4" />}
-                Test
+                {isWebScrape ? "Test Scrape" : "Test"}
               </button>
             </div>
             {testResult && (
@@ -137,6 +182,22 @@ function FeedFormDialog({ open, onClose, feed }: FeedFormProps) {
               </div>
             )}
           </div>
+
+          {/* CSS Selector (web scrape only) */}
+          {isWebScrape && (
+            <div>
+              <label className="mb-1 block text-sm font-medium">CSS Selector (optional)</label>
+              <input
+                className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-ring"
+                value={cssSelector}
+                onChange={(e) => setCssSelector(e.target.value)}
+                placeholder="e.g. article a, .post-title a"
+              />
+              <p className="mt-1 text-xs text-muted-foreground">
+                CSS selector for article links (optional — auto-detects if empty)
+              </p>
+            </div>
+          )}
 
           {/* Competitor */}
           <div>
@@ -255,7 +316,11 @@ function FeedRow({ feed, onEdit }: FeedRowProps) {
       <tr className="border-b border-border hover:bg-muted/50">
         <td className="px-4 py-3">
           <div className="flex items-center gap-2">
-            <Rss className="h-4 w-4 shrink-0 text-muted-foreground" />
+            {feed.feed_type === "web_scrape" ? (
+              <Globe className="h-4 w-4 shrink-0 text-muted-foreground" />
+            ) : (
+              <Rss className="h-4 w-4 shrink-0 text-muted-foreground" />
+            )}
             <div>
               <div className="font-medium">{feed.name}</div>
               <a
@@ -398,9 +463,9 @@ export default function Feeds() {
     <div>
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-bold">RSS Feeds</h1>
+          <h1 className="text-2xl font-bold">Feed Sources</h1>
           <p className="mt-1 text-sm text-muted-foreground">
-            Manage RSS feed sources for competitive intelligence monitoring.
+            Manage RSS and web scrape sources for competitive intelligence monitoring.
           </p>
         </div>
         <button
@@ -436,7 +501,7 @@ export default function Feeds() {
         <div className="mt-12 flex flex-col items-center gap-2 text-center text-muted-foreground">
           <Rss className="h-10 w-10" />
           <p className="text-lg font-medium">No feeds yet</p>
-          <p className="text-sm">Add an RSS feed to start monitoring competitive intelligence.</p>
+          <p className="text-sm">Add a feed source to start monitoring competitive intelligence.</p>
         </div>
       )}
 

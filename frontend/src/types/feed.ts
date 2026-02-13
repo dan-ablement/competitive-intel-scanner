@@ -2,6 +2,8 @@ export interface RssFeed {
   id: string;
   name: string;
   url: string;
+  feed_type: 'rss' | 'web_scrape';
+  css_selector: string | null;
   competitor_id: string | null;
   competitor_name: string | null;
   is_active: boolean;
