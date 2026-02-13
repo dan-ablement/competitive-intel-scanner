@@ -12,6 +12,7 @@ from backend.models.check_run import CheckRun
 from backend.models.feed import RSSFeed
 from backend.models.feed_item import FeedItem
 from backend.services.llm_analyzer import LLMAnalyzer
+from backend.services.web_scraper import WebScraper
 
 logger = logging.getLogger(__name__)
 
@@ -22,6 +23,7 @@ class FeedChecker:
     def __init__(self, db: Session):
         self.db = db
         self.analyzer = LLMAnalyzer()
+        self.web_scraper = WebScraper()
 
     # ------------------------------------------------------------------
     # Public API
@@ -112,6 +114,11 @@ class FeedChecker:
 
     def _process_feed(self, feed: RSSFeed) -> int:
         """Fetch and parse a single feed. Returns count of new items inserted."""
+        # Dispatch based on feed type
+        if feed.feed_type == "web_scrape":
+            return self.web_scraper.process_feed(feed, self.db)
+
+        # Default: RSS feed processing
         now = datetime.now(timezone.utc)
         feed.last_checked_at = now
 
