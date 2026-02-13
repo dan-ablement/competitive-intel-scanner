@@ -26,6 +26,8 @@ class FeedCreate(BaseModel):
     name: str
     url: str
     competitor_id: Optional[str] = None
+    feed_type: Optional[str] = "rss"
+    css_selector: Optional[str] = None
 
 
 class FeedUpdate(BaseModel):
@@ -33,6 +35,8 @@ class FeedUpdate(BaseModel):
     url: Optional[str] = None
     competitor_id: Optional[str] = None
     is_active: Optional[bool] = None
+    feed_type: Optional[str] = None
+    css_selector: Optional[str] = None
 
 
 class FeedResponse(BaseModel):
@@ -41,6 +45,8 @@ class FeedResponse(BaseModel):
     url: str
     competitor_id: Optional[str]
     competitor_name: Optional[str] = None
+    feed_type: str = "rss"
+    css_selector: Optional[str] = None
     is_active: bool
     last_checked_at: Optional[str]
     last_successful_at: Optional[str]
@@ -70,6 +76,8 @@ def _feed_to_response(feed: RSSFeed) -> dict:
         "url": feed.url,
         "competitor_id": str(feed.competitor_id) if feed.competitor_id else None,
         "competitor_name": competitor_name,
+        "feed_type": feed.feed_type or "rss",
+        "css_selector": feed.css_selector,
         "is_active": feed.is_active,
         "last_checked_at": feed.last_checked_at.isoformat() if feed.last_checked_at else None,
         "last_successful_at": feed.last_successful_at.isoformat() if feed.last_successful_at else None,
@@ -119,6 +127,8 @@ def create_feed(body: FeedCreate, request: Request, db: Session = Depends(get_db
         name=body.name,
         url=body.url,
         competitor_id=competitor_id_val,
+        feed_type=body.feed_type or "rss",
+        css_selector=body.css_selector,
         is_active=True,
         error_count=0,
         created_by=current_user.id,
@@ -167,6 +177,10 @@ def update_feed(feed_id: str, body: FeedUpdate, db: Session = Depends(get_db)):
             feed.competitor_id = comp.id
     if body.is_active is not None:
         feed.is_active = body.is_active
+    if body.feed_type is not None:
+        feed.feed_type = body.feed_type
+    if body.css_selector is not None:
+        feed.css_selector = body.css_selector if body.css_selector != "" else None
 
     db.commit()
     db.refresh(feed)

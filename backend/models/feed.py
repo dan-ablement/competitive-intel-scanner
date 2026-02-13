@@ -19,6 +19,8 @@ class RSSFeed(Base):
     competitor_id: Mapped[uuid.UUID | None] = mapped_column(
         UUID(as_uuid=True), ForeignKey("competitors.id"), nullable=True
     )
+    feed_type: Mapped[str] = mapped_column(String, default="rss", server_default="rss", nullable=False)
+    css_selector: Mapped[str | None] = mapped_column(Text, nullable=True)
     is_active: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
     last_checked_at: Mapped[datetime | None] = mapped_column(nullable=True)
     last_successful_at: Mapped[datetime | None] = mapped_column(nullable=True)
