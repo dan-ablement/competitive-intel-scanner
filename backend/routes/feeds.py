@@ -257,7 +257,10 @@ def _test_feed_url(url: str, feed_type: str = "rss", css_selector: str | None = 
 
 
 def _test_web_scrape_url(url: str, css_selector: str | None = None) -> dict:
-    """Test a web scrape URL by crawling the listing page and counting article links."""
+    """Test a web scrape URL by crawling only the listing page and counting article links.
+
+    This is lightweight — it does NOT crawl individual articles, so it completes quickly.
+    """
     import asyncio
     from backend.services.web_scraper import WebScraper
 
@@ -268,18 +271,26 @@ def _test_web_scrape_url(url: str, css_selector: str | None = None) -> dict:
             if loop.is_running():
                 import concurrent.futures
                 with concurrent.futures.ThreadPoolExecutor() as pool:
-                    articles = pool.submit(
+                    result = pool.submit(
                         asyncio.run,
-                        scraper.scrape_listing(url, css_selector),
+                        scraper.test_listing(url, css_selector),
                     ).result()
             else:
-                articles = loop.run_until_complete(
-                    scraper.scrape_listing(url, css_selector)
+                result = loop.run_until_complete(
+                    scraper.test_listing(url, css_selector)
                 )
         except RuntimeError:
-            articles = asyncio.run(scraper.scrape_listing(url, css_selector))
+            result = asyncio.run(scraper.test_listing(url, css_selector))
 
-        if not articles:
+        if not result.get("valid"):
+            return {
+                "success": False,
+                "message": "Failed to crawl listing page. Check the URL and try again.",
+                "item_count": 0,
+            }
+
+        count = result.get("article_count", 0)
+        if count == 0:
             return {
                 "success": True,
                 "message": "Page crawled successfully but no article links were found. "
@@ -289,8 +300,8 @@ def _test_web_scrape_url(url: str, css_selector: str | None = None) -> dict:
 
         return {
             "success": True,
-            "message": f"Successfully crawled page — {len(articles)} article(s) found.",
-            "item_count": len(articles),
+            "message": f"Found {count} article link(s) on listing page.",
+            "item_count": count,
         }
     except Exception as exc:
         return {"success": False, "message": f"Error crawling page: {str(exc)}", "item_count": 0}

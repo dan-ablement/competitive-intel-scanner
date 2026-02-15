@@ -40,14 +40,23 @@ class WebScraper:
 
     async def scrape_listing(
         self, url: str, css_selector: Optional[str] = None,
+        max_articles: int = 20,
     ) -> list[dict]:
         """Crawl a listing page and extract article content.
+
+        Args:
+            url: The listing page URL to crawl.
+            css_selector: Optional CSS selector to scope link extraction.
+            max_articles: Maximum number of articles to crawl (default 20).
 
         Returns list of dicts with keys: url, title, content, published_at
         """
         from crawl4ai import AsyncWebCrawler, BrowserConfig, CrawlerRunConfig
 
-        browser_config = BrowserConfig(headless=True)
+        browser_config = BrowserConfig(
+            headless=True,
+            extra_args=["--disable-gpu", "--disable-dev-shm-usage", "--no-sandbox"],
+        )
         articles: list[dict] = []
 
         try:
@@ -65,10 +74,17 @@ class WebScraper:
                 article_links = self._extract_article_links(result, url, css_selector)
                 logger.info("Found %d article links on %s", len(article_links), url)
 
+                # Cap to max_articles to prevent excessive memory usage
+                if len(article_links) > max_articles:
+                    logger.info("Truncating to %d articles (from %d)", max_articles, len(article_links))
+                    article_links = article_links[:max_articles]
+
+                article_config = CrawlerRunConfig(page_timeout=30000)
+
                 for link_url, link_title in article_links:
                     try:
                         article_result = await crawler.arun(
-                            url=link_url, config=CrawlerRunConfig())
+                            url=link_url, config=article_config)
                         if not article_result.success:
                             logger.warning("Failed to crawl article %s", link_url)
                             continue
@@ -80,11 +96,57 @@ class WebScraper:
                             "published_at": datetime.now(timezone.utc),
                         })
                     except Exception as exc:
-                        logger.warning("Error crawling article %s: %s", link_url, exc)
+                        logger.warning("Error crawling article %s (skipping): %s", link_url, exc)
         except Exception as exc:
             logger.exception("Error during web scraping of %s: %s", url, exc)
 
         return articles
+
+    async def test_listing(
+        self, url: str, css_selector: Optional[str] = None,
+    ) -> dict:
+        """Lightweight test: crawl only the listing page and count article links.
+
+        Does NOT crawl individual articles. Returns quickly for use in test-url endpoint.
+
+        Returns dict with keys: valid, article_count, sample_links
+        """
+        from crawl4ai import AsyncWebCrawler, BrowserConfig, CrawlerRunConfig
+
+        browser_config = BrowserConfig(
+            headless=True,
+            extra_args=["--disable-gpu", "--disable-dev-shm-usage", "--no-sandbox"],
+        )
+
+        try:
+            async with AsyncWebCrawler(config=browser_config) as crawler:
+                listing_config = CrawlerRunConfig()
+                if css_selector:
+                    listing_config = CrawlerRunConfig(css_selector=css_selector)
+
+                result = await crawler.arun(url=url, config=listing_config)
+                if not result.success:
+                    return {
+                        "valid": False,
+                        "article_count": 0,
+                        "sample_links": [],
+                    }
+
+                article_links = self._extract_article_links(result, url, css_selector)
+                sample_links = [link_url for link_url, _ in article_links[:5]]
+
+                return {
+                    "valid": True,
+                    "article_count": len(article_links),
+                    "sample_links": sample_links,
+                }
+        except Exception as exc:
+            logger.exception("Error testing listing page %s: %s", url, exc)
+            return {
+                "valid": False,
+                "article_count": 0,
+                "sample_links": [],
+            }
 
     def _extract_article_links(
         self, result, base_url: str, css_selector: Optional[str] = None,
