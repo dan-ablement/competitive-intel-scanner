@@ -10,6 +10,7 @@ class Settings(BaseSettings):
     GOOGLE_CLIENT_SECRET: str = ""
     ALLOWED_DOMAIN: str = "augmentcode.com"
     SESSION_SECRET: str = "change-me-in-production"
+    X_BEARER_TOKEN: str = ""
 
     class Config:
         env_file = os.path.join(os.path.dirname(__file__), "..", ".env")
