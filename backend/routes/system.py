@@ -146,11 +146,11 @@ def trigger_profile_review(db: Session = Depends(get_db)):
 # Read-only schedule configuration (matches Cloud Scheduler setup)
 SCHEDULE_CONFIG = {
     "feed_checks": [
-        {"time": "12:05 AM ET", "cron": "5 0 * * *", "purpose": "Overnight check"},
-        {"time": "9:05 AM ET", "cron": "5 9 * * *", "purpose": "Morning check + briefing"},
-        {"time": "12:05 PM ET", "cron": "5 12 * * *", "purpose": "Midday check"},
-        {"time": "5:05 PM ET", "cron": "5 17 * * *", "purpose": "End of business check"},
-        {"time": "8:05 PM ET", "cron": "5 20 * * *", "purpose": "Evening check"},
+        {"time": "12:05 AM ET", "cron": "5 0 * * 1-5", "purpose": "Overnight check"},
+        {"time": "9:05 AM ET", "cron": "5 9 * * 1-5", "purpose": "Morning check + briefing"},
+        {"time": "12:05 PM ET", "cron": "5 12 * * 1-5", "purpose": "Midday check"},
+        {"time": "5:05 PM ET", "cron": "5 17 * * 1-5", "purpose": "End of business check"},
+        {"time": "8:05 PM ET", "cron": "5 20 * * 1-5", "purpose": "Evening check"},
     ],
     "maintenance": {
         "profile_review": {

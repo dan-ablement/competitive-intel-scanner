@@ -133,12 +133,29 @@ class LLMAnalyzer:
         feed: RSSFeed = item.feed
         feed_name = feed.name if feed else "Unknown Feed"
 
+        # Twitter items have no title — synthesise one from the tweet text
+        is_twitter = feed and feed.feed_type == "twitter"
+        if is_twitter:
+            item_title = f"Tweet by @{item.author}" if item.author else "Tweet"
+            item_content = item.raw_content[:8000]
+            # Append engagement metrics when available
+            if item.raw_metadata and item.raw_metadata.get("public_metrics"):
+                metrics = item.raw_metadata["public_metrics"]
+                item_content += (
+                    f"\n\n[Engagement: {metrics.get('like_count', 0)} likes, "
+                    f"{metrics.get('retweet_count', 0)} retweets, "
+                    f"{metrics.get('reply_count', 0)} replies]"
+                )
+        else:
+            item_title = item.title
+            item_content = item.raw_content[:8000]  # Truncate very long content
+
         prompt = build_feed_evaluation_prompt(
             augment_profile=augment_profile_text,
             competitor_list_with_profiles=competitor_profiles_text,
             feed_name=feed_name,
-            item_title=item.title,
-            item_content=item.raw_content[:8000],  # Truncate very long content
+            item_title=item_title,
+            item_content=item_content,
             item_url=item.url,
             item_published_at=item.published_at.isoformat() if item.published_at else "Unknown",
         )

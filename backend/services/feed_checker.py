@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import asyncio
 import logging
 import uuid
 from datetime import datetime, timezone
@@ -12,6 +13,7 @@ from backend.models.check_run import CheckRun
 from backend.models.feed import RSSFeed
 from backend.models.feed_item import FeedItem
 from backend.services.llm_analyzer import LLMAnalyzer
+from backend.services.twitter_ingester import TwitterIngester
 from backend.services.web_scraper import WebScraper
 
 logger = logging.getLogger(__name__)
@@ -117,6 +119,9 @@ class FeedChecker:
         # Dispatch based on feed type
         if feed.feed_type == "web_scrape":
             return self.web_scraper.process_feed(feed, self.db)
+
+        if feed.feed_type == "twitter":
+            return self._process_twitter_feed(feed)
 
         # Default: RSS feed processing
         now = datetime.now(timezone.utc)
@@ -229,3 +234,96 @@ class FeedChecker:
             return summary
 
         return ""
+
+
+    # ------------------------------------------------------------------
+    # Twitter helpers
+    # ------------------------------------------------------------------
+
+    def _process_twitter_feed(self, feed: RSSFeed) -> int:
+        """Fetch tweets for a Twitter feed and insert new items. Returns count of new items."""
+        config = feed.twitter_config
+        if not config:
+            raise RuntimeError("Twitter feed is missing its TwitterSourceConfig")
+
+        now = datetime.now(timezone.utc)
+        feed.last_checked_at = now
+
+        ingester = TwitterIngester()
+
+        async def _fetch() -> list[dict]:
+            try:
+                if config.backfill_completed and config.last_tweet_id:
+                    return await ingester.fetch_tweets_incremental(
+                        config.x_user_id, config,
+                    )
+                else:
+                    return await ingester.fetch_tweets_backfill(
+                        config.x_user_id, config,
+                        backfill_days=config.initial_backfill_days,
+                    )
+            finally:
+                await ingester.close()
+
+        # Run async fetch in sync context
+        try:
+            loop = asyncio.get_event_loop()
+            if loop.is_running():
+                import concurrent.futures
+                with concurrent.futures.ThreadPoolExecutor() as pool:
+                    tweets = pool.submit(asyncio.run, _fetch()).result()
+            else:
+                tweets = loop.run_until_complete(_fetch())
+        except RuntimeError:
+            tweets = asyncio.run(_fetch())
+
+        new_count = 0
+        latest_tweet_id: str | None = None
+
+        for tweet in tweets:
+            item_dict = ingester.tweet_to_feed_item(
+                tweet, feed_id=feed.id, x_username=config.x_username,
+            )
+            guid = item_dict["guid"]
+
+            # Dedup: skip if (feed_id, guid) already exists
+            existing = (
+                self.db.query(FeedItem.id)
+                .filter(FeedItem.feed_id == feed.id, FeedItem.guid == guid)
+                .first()
+            )
+            if existing:
+                continue
+
+            item = FeedItem(
+                id=uuid.uuid4(),
+                feed_id=item_dict["feed_id"],
+                guid=guid,
+                title=item_dict["title"],
+                url=item_dict["url"],
+                author=item_dict["author"],
+                published_at=item_dict["published_at"],
+                raw_content=item_dict["raw_content"],
+                raw_metadata=item_dict["raw_metadata"],
+                is_processed=False,
+            )
+            self.db.add(item)
+            new_count += 1
+
+            # Track the highest tweet ID for since_id on next run
+            if latest_tweet_id is None or guid > latest_tweet_id:
+                latest_tweet_id = guid
+
+        # Update config state
+        if latest_tweet_id:
+            config.last_tweet_id = latest_tweet_id
+        if not config.backfill_completed:
+            config.backfill_completed = True
+
+        # Success: reset error state, update timestamps
+        feed.last_successful_at = now
+        feed.error_count = 0
+        feed.last_error = None
+        self.db.commit()
+
+        return new_count
