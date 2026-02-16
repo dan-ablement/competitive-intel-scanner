@@ -15,7 +15,7 @@ class RSSFeed(Base):
 
     id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     name: Mapped[str] = mapped_column(String, nullable=False)
-    url: Mapped[str] = mapped_column(String, unique=True, nullable=False)
+    url: Mapped[str | None] = mapped_column(String, nullable=True)
     competitor_id: Mapped[uuid.UUID | None] = mapped_column(
         UUID(as_uuid=True), ForeignKey("competitors.id"), nullable=True
     )
@@ -33,4 +33,5 @@ class RSSFeed(Base):
     competitor = relationship("Competitor", back_populates="feeds")
     creator = relationship("User")
     items = relationship("FeedItem", back_populates="feed")
+    twitter_config = relationship("TwitterSourceConfig", back_populates="feed", uselist=False)
 
