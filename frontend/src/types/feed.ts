@@ -2,7 +2,7 @@ export interface RssFeed {
   id: string;
   name: string;
   url: string;
-  feed_type: 'rss' | 'web_scrape';
+  feed_type: 'rss' | 'web_scrape' | 'twitter';
   css_selector: string | null;
   competitor_id: string | null;
   competitor_name: string | null;
@@ -14,5 +14,11 @@ export interface RssFeed {
   created_by: string;
   created_at: string;
   updated_at: string;
+  // Twitter-specific fields (populated when feed_type === 'twitter')
+  x_username?: string;
+  x_user_id?: string;
+  backfill_completed?: boolean;
+  include_retweets?: boolean;
+  include_replies?: boolean;
 }
 

@@ -33,12 +33,53 @@ export async function testFeed(id: string): Promise<TestFeedResult> {
 
 export interface TestFeedUrlPayload {
   url: string;
-  feed_type?: 'rss' | 'web_scrape';
+  feed_type?: 'rss' | 'web_scrape' | 'twitter';
   css_selector?: string | null;
 }
 
 export async function testFeedUrl(payload: TestFeedUrlPayload): Promise<TestFeedResult> {
   const { data } = await apiClient.post<TestFeedResult>("/feeds/test-url", payload);
+  return data;
+}
+
+// ---------------------------------------------------------------------------
+// Twitter validation
+// ---------------------------------------------------------------------------
+
+export interface TwitterValidationResult {
+  valid: boolean;
+  user_id: string;
+  username: string;
+  name: string;
+  profile_image_url: string;
+  description: string;
+  followers_count: number;
+  tweet_count: number;
+  error?: string;
+}
+
+export async function validateTwitterUsername(
+  username: string,
+): Promise<TwitterValidationResult> {
+  const { data } = await apiClient.post<TwitterValidationResult>(
+    "/feeds/validate-twitter",
+    { username },
+  );
+  return data;
+}
+
+// ---------------------------------------------------------------------------
+// Re-backfill
+// ---------------------------------------------------------------------------
+
+export async function rebackfillFeed(
+  feedId: string,
+  days: number,
+): Promise<{ message: string }> {
+  const { data } = await apiClient.post<{ message: string }>(
+    `/feeds/${feedId}/rebackfill`,
+    { days },
+  );
   return data;
 }
 

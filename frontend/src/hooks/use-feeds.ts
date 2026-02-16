@@ -1,5 +1,14 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { listFeeds, createFeed, updateFeed, deleteFeed, testFeed, testFeedUrl } from "@/api/feeds";
+import {
+  listFeeds,
+  createFeed,
+  updateFeed,
+  deleteFeed,
+  testFeed,
+  testFeedUrl,
+  validateTwitterUsername,
+  rebackfillFeed,
+} from "@/api/feeds";
 import type { RssFeed } from "@/types";
 
 export function useFeeds() {
@@ -42,6 +51,21 @@ export function useTestFeed() {
 export function useTestFeedUrl() {
   return useMutation({
     mutationFn: testFeedUrl,
+  });
+}
+
+export function useValidateTwitter() {
+  return useMutation({
+    mutationFn: (username: string) => validateTwitterUsername(username),
+  });
+}
+
+export function useRebackfill() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({ feedId, days }: { feedId: string; days: number }) =>
+      rebackfillFeed(feedId, days),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["feeds"] }),
   });
 }
 
