@@ -78,6 +78,11 @@ class FeedResponse(BaseModel):
     created_at: str
     updated_at: str
     twitter_config: Optional[TwitterConfigResponse] = None
+    x_username: Optional[str] = None
+    x_user_id: Optional[str] = None
+    backfill_completed: Optional[bool] = None
+    include_retweets: Optional[bool] = None
+    include_replies: Optional[bool] = None
 
 
 class TestFeedResponse(BaseModel):
