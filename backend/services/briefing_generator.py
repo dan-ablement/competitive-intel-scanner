@@ -18,6 +18,7 @@ from backend.models.augment_profile import AugmentProfile
 from backend.models.briefing import Briefing, BriefingCard
 from backend.models.competitor import Competitor
 from backend.prompts.briefing import build_briefing_prompt
+from backend.utils import utc_isoformat
 
 logger = logging.getLogger(__name__)
 
@@ -41,7 +42,7 @@ class BriefingGenerator:
 
         Returns the created Briefing, or None if no cards were found.
         """
-        today = date.today()
+        today = datetime.now(timezone.utc).date()
 
         # Check if a briefing already exists for today
         existing = db.query(Briefing).filter(Briefing.date == today).first()
@@ -169,7 +170,7 @@ class BriefingGenerator:
                 "suggested_counter_moves": card.suggested_counter_moves,
                 "status": card.status,
                 "competitors": competitor_names,
-                "created_at": card.created_at.isoformat() if card.created_at else None,
+                "created_at": utc_isoformat(card.created_at),
             })
         return json.dumps(card_dicts, indent=2)
 

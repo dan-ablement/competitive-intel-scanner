@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import uuid
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Query
@@ -10,6 +10,7 @@ from sqlalchemy.orm import Session
 
 from backend.database import get_db
 from backend.models.profile_suggestion import ProfileUpdateSuggestion
+from backend.utils import utc_isoformat
 from backend.models.competitor import Competitor
 from backend.models.augment_profile import AugmentProfile
 
@@ -49,8 +50,8 @@ class SuggestionResponse(BaseModel):
             source_card_ids=obj.source_card_ids or [],
             status=obj.status,
             reviewed_by=str(obj.reviewed_by) if obj.reviewed_by else None,
-            reviewed_at=obj.reviewed_at.isoformat() if obj.reviewed_at else None,
-            created_at=obj.created_at.isoformat() if obj.created_at else "",
+            reviewed_at=utc_isoformat(obj.reviewed_at),
+            created_at=utc_isoformat(obj.created_at) or "",
         )
 
 
@@ -102,7 +103,7 @@ def approve_suggestion(
 
     # Mark as approved
     suggestion.status = "approved"
-    suggestion.reviewed_at = datetime.utcnow()
+    suggestion.reviewed_at = datetime.now(timezone.utc)
     db.commit()
     db.refresh(suggestion)
 
@@ -129,7 +130,7 @@ def reject_suggestion(
         raise HTTPException(status_code=400, detail="Suggestion is not pending")
 
     suggestion.status = "rejected"
-    suggestion.reviewed_at = datetime.utcnow()
+    suggestion.reviewed_at = datetime.now(timezone.utc)
     db.commit()
     db.refresh(suggestion)
 

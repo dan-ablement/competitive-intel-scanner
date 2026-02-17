@@ -8,6 +8,7 @@ from pydantic import BaseModel
 from sqlalchemy.orm import Session
 
 from backend.database import get_db
+from backend.utils import utc_isoformat
 from backend.models.check_run import CheckRun
 from backend.services.briefing_generator import BriefingGenerator
 from backend.services.feed_checker import FeedChecker
@@ -31,24 +32,32 @@ class CheckRunResponse(BaseModel):
     new_items_found: int
     cards_generated: int
     error_log: Optional[str]
+    briefing_id: Optional[str] = None
+    briefing_error: Optional[str] = None
 
 
 # ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------
 
-def _check_run_to_response(cr: CheckRun) -> dict:
+def _check_run_to_response(
+    cr: CheckRun,
+    briefing_id: str | None = None,
+    briefing_error: str | None = None,
+) -> dict:
     """Serialize a CheckRun model to a dict matching CheckRunResponse."""
     return {
         "id": str(cr.id),
-        "scheduled_time": cr.scheduled_time.isoformat() if cr.scheduled_time else None,
-        "started_at": cr.started_at.isoformat() if cr.started_at else None,
-        "completed_at": cr.completed_at.isoformat() if cr.completed_at else None,
+        "scheduled_time": utc_isoformat(cr.scheduled_time),
+        "started_at": utc_isoformat(cr.started_at),
+        "completed_at": utc_isoformat(cr.completed_at),
         "status": cr.status,
         "feeds_checked": cr.feeds_checked,
         "new_items_found": cr.new_items_found,
         "cards_generated": cr.cards_generated,
         "error_log": cr.error_log,
+        "briefing_id": briefing_id,
+        "briefing_error": briefing_error,
     }
 
 
@@ -75,19 +84,23 @@ def trigger_check_feeds(
         check_run = checker.run()
 
         # Generate briefing if requested (e.g., morning 9:05 AM run)
+        briefing_id = None
+        briefing_error = None
+
         if generate_briefing:
             try:
                 generator = BriefingGenerator()
                 briefing = generator.generate_briefing(db)
                 if briefing:
+                    briefing_id = str(briefing.id)
                     logger.info("Morning briefing generated: %s", briefing.id)
                 else:
                     logger.info("No briefing generated (no recent cards or already exists)")
             except Exception as briefing_exc:
+                briefing_error = str(briefing_exc)
                 logger.exception("Briefing generation failed (feed check still succeeded)")
-                # Don't fail the whole check-feeds response; briefing is supplementary
 
-        return _check_run_to_response(check_run)
+        return _check_run_to_response(check_run, briefing_id=briefing_id, briefing_error=briefing_error)
     except Exception as exc:
         logger.exception("Feed check run failed unexpectedly")
         raise HTTPException(status_code=500, detail=f"Feed check failed: {str(exc)}")

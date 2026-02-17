@@ -6,7 +6,7 @@ import json
 import logging
 import time
 import uuid
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from typing import Any
 
 import anthropic
@@ -18,6 +18,7 @@ from backend.models.augment_profile import AugmentProfile
 from backend.models.competitor import Competitor
 from backend.models.profile_suggestion import ProfileUpdateSuggestion
 from backend.prompts.profile_review import build_profile_review_messages, PROFILE_REVIEW_SYSTEM
+from backend.utils import utc_isoformat
 
 logger = logging.getLogger(__name__)
 
@@ -73,7 +74,7 @@ class ProfileReviewer:
     def _review_single_competitor(self, competitor: Competitor) -> int:
         """Review one competitor profile. Returns number of suggestions created."""
         # Get recent approved cards linked to this competitor
-        cutoff = datetime.utcnow() - timedelta(days=REVIEW_WINDOW_DAYS)
+        cutoff = datetime.now(timezone.utc) - timedelta(days=REVIEW_WINDOW_DAYS)
         cards = (
             self.db.query(AnalysisCard)
             .join(AnalysisCardCompetitor)
@@ -120,7 +121,7 @@ class ProfileReviewer:
             logger.info("No Augment profile configured, skipping review")
             return 0
 
-        cutoff = datetime.utcnow() - timedelta(days=REVIEW_WINDOW_DAYS)
+        cutoff = datetime.now(timezone.utc) - timedelta(days=REVIEW_WINDOW_DAYS)
         cards = (
             self.db.query(AnalysisCard)
             .filter(
@@ -189,7 +190,7 @@ class ProfileReviewer:
                 f"Priority: {card.priority}\n"
                 f"Summary: {card.summary}\n"
                 f"Impact: {card.impact_assessment}\n"
-                f"Created: {card.created_at.isoformat() if card.created_at else 'Unknown'}"
+                f"Created: {utc_isoformat(card.created_at) or 'Unknown'}"
             )
         return "\n\n".join(parts) if parts else "No cards available."
 

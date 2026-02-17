@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import uuid
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Request
@@ -17,6 +17,7 @@ from backend.models.analysis_card import (
 )
 from backend.models.user import User
 from backend.routes.auth import get_current_user
+from backend.utils import utc_isoformat
 
 router = APIRouter()
 
@@ -116,11 +117,11 @@ def _card_to_response(card: AnalysisCard) -> dict:
         "raw_llm_output": card.raw_llm_output,
         "status": card.status,
         "approved_by": str(card.approved_by) if card.approved_by else None,
-        "approved_at": card.approved_at.isoformat() if card.approved_at else None,
+        "approved_at": utc_isoformat(card.approved_at),
         "check_run_id": str(card.check_run_id) if card.check_run_id else None,
         "competitors": competitors,
-        "created_at": card.created_at.isoformat() if card.created_at else None,
-        "updated_at": card.updated_at.isoformat() if card.updated_at else None,
+        "created_at": utc_isoformat(card.created_at),
+        "updated_at": utc_isoformat(card.updated_at),
     }
 
 
@@ -149,8 +150,8 @@ def _comment_to_response(comment: AnalysisCardComment) -> dict:
         "content": comment.content,
         "parent_comment_id": str(comment.parent_comment_id) if comment.parent_comment_id else None,
         "resolved": comment.resolved,
-        "created_at": comment.created_at.isoformat() if comment.created_at else None,
-        "updated_at": comment.updated_at.isoformat() if comment.updated_at else None,
+        "created_at": utc_isoformat(comment.created_at),
+        "updated_at": utc_isoformat(comment.updated_at),
         "replies": replies,
     }
 
@@ -166,7 +167,7 @@ def _edit_to_response(edit: AnalysisCardEdit) -> dict:
         "field_changed": edit.field_changed,
         "previous_value": edit.previous_value,
         "new_value": edit.new_value,
-        "created_at": edit.created_at.isoformat() if edit.created_at else None,
+        "created_at": utc_isoformat(edit.created_at),
     }
 
 
@@ -318,7 +319,7 @@ def update_card_status(
     # If approving, set approved_by and approved_at
     if body.status == "approved":
         card.approved_by = current_user.id
-        card.approved_at = datetime.utcnow()
+        card.approved_at = datetime.now(timezone.utc)
 
     db.commit()
     db.refresh(card)
