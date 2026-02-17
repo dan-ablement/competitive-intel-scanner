@@ -96,6 +96,7 @@ class ValidateTwitterResponse(BaseModel):
     user_id: Optional[str] = None
     name: Optional[str] = None
     followers_count: Optional[int] = None
+    tweet_count: Optional[int] = None
     description: Optional[str] = None
     profile_image_url: Optional[str] = None
     error: Optional[str] = None
@@ -139,6 +140,11 @@ def _feed_to_response(feed: RSSFeed) -> dict:
         "created_at": feed.created_at.isoformat() if feed.created_at else None,
         "updated_at": feed.updated_at.isoformat() if feed.updated_at else None,
         "twitter_config": twitter_config_data,
+        "x_username": twitter_config_data["x_username"] if twitter_config_data else None,
+        "x_user_id": twitter_config_data["x_user_id"] if twitter_config_data else None,
+        "backfill_completed": twitter_config_data["backfill_completed"] if twitter_config_data else None,
+        "include_retweets": twitter_config_data["include_retweets"] if twitter_config_data else None,
+        "include_replies": twitter_config_data["include_replies"] if twitter_config_data else None,
     }
 
 
@@ -330,6 +336,7 @@ def validate_twitter(body: ValidateTwitterRequest):
             "user_id": user_data.get("id"),
             "name": user_data.get("name"),
             "followers_count": metrics.get("followers_count"),
+            "tweet_count": metrics.get("tweet_count"),
             "description": user_data.get("description"),
             "profile_image_url": user_data.get("profile_image_url"),
         }

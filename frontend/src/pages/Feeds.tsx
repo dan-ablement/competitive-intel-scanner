@@ -282,13 +282,13 @@ function FeedFormDialog({ open, onClose, feed }: FeedFormProps) {
                         <div className="mt-2 flex gap-4 text-xs text-muted-foreground">
                           <span>
                             <span className="font-medium text-foreground">
-                              {twitterProfile.followers_count.toLocaleString()}
+                              {(twitterProfile.followers_count ?? 0).toLocaleString()}
                             </span>{" "}
                             followers
                           </span>
                           <span>
                             <span className="font-medium text-foreground">
-                              {twitterProfile.tweet_count.toLocaleString()}
+                              {(twitterProfile.tweet_count ?? 0).toLocaleString()}
                             </span>{" "}
                             tweets
                           </span>
@@ -578,7 +578,7 @@ function FeedRow({ feed, onEdit }: FeedRowProps) {
                   rel="noopener noreferrer"
                   className="inline-flex items-center gap-1 text-xs text-muted-foreground hover:underline"
                 >
-                  {feed.url.length > 60 ? feed.url.slice(0, 60) + "…" : feed.url}
+                  {feed.url && feed.url.length > 60 ? feed.url.slice(0, 60) + "…" : feed.url}
                   <ExternalLink className="h-3 w-3" />
                 </a>
               )}
