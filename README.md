@@ -1,6 +1,6 @@
 # Competitive Intelligence Scanner
 
-A competitive intelligence scanning app for Augment Code's GTM team. Ingests RSS feeds on a schedule, uses Claude to evaluate competitive developments, and provides a collaborative review workflow.
+A competitive intelligence scanning app for Augment Code's GTM team. Monitors competitor activity across **RSS feeds**, **web pages** (via Crawl4AI), and **Twitter/X accounts**, then uses Claude to evaluate developments and surface insights through a collaborative review workflow.
 
 ## Tech Stack
 
@@ -8,6 +8,18 @@ A competitive intelligence scanning app for Augment Code's GTM team. Ingests RSS
 - **Frontend:** React 18, TypeScript, Vite, Tailwind CSS
 - **LLM:** Anthropic Claude API
 - **Database:** PostgreSQL
+- **Web Scraping:** Crawl4AI + Playwright (headless Chromium)
+- **Twitter/X:** X API v2 via httpx
+
+## Source Types
+
+| Type | How it works | Key service |
+|------|-------------|-------------|
+| **RSS Feed** | Parses standard RSS/Atom feeds on a schedule | `feed_checker.py` |
+| **Web Scrape** | Crawls competitor pages with Crawl4AI, extracts article links, and ingests new content | `web_scraper.py` |
+| **Twitter/X** | Polls the X API v2 for new tweets from monitored accounts using Bearer token auth | `twitter_ingester.py` |
+
+All three source types feed into the same LLM analysis pipeline — items are scored for relevance and surfaced as analysis cards in the review UI.
 
 ## Prerequisites
 
@@ -48,6 +60,7 @@ A competitive intelligence scanning app for Augment Code's GTM team. Ingests RSS
 |---|---|
 | `DATABASE_URL` | PostgreSQL connection string (set automatically in docker-compose) |
 | `ANTHROPIC_API_KEY` | Anthropic Claude API key for LLM analysis |
+| `X_BEARER_TOKEN` | X API Bearer token for Twitter/X monitoring |
 | `GOOGLE_CLIENT_ID` | Google OAuth client ID for SSO |
 | `GOOGLE_CLIENT_SECRET` | Google OAuth client secret |
 | `ALLOWED_DOMAIN` | Allowed email domain for login (e.g., `augmentcode.com`) |
@@ -75,16 +88,35 @@ docker-compose up --build
 ## Project Structure
 
 ```
-├── backend/          # FastAPI backend
-│   ├── main.py       # App entrypoint
-│   ├── models/       # SQLAlchemy models
-│   ├── routes/       # API route handlers
-│   ├── services/     # Business logic
-│   └── alembic/      # Database migrations
-├── frontend/         # React frontend
+├── backend/
+│   ├── main.py                        # App entrypoint
+│   ├── models/
+│   │   ├── feed.py                    # RSS feed / source model
+│   │   ├── feed_item.py               # Ingested content items
+│   │   ├── twitter_source_config.py   # Twitter/X per-source settings
+│   │   ├── analysis_card.py           # LLM-generated analysis cards
+│   │   └── ...
+│   ├── services/
+│   │   ├── feed_checker.py            # RSS feed ingestion
+│   │   ├── web_scraper.py             # Crawl4AI web scraping
+│   │   ├── twitter_ingester.py        # X API v2 ingestion
+│   │   ├── llm_analyzer.py            # Claude analysis pipeline
+│   │   └── ...
+│   ├── routes/                        # API route handlers
+│   └── alembic/                       # Database migrations
+├── frontend/                          # React frontend
 │   └── src/
-├── Dockerfile        # Multi-stage build
+├── Dockerfile                         # Multi-stage build (includes Playwright/Chromium)
 ├── docker-compose.yml
 ├── requirements.txt
 └── .env.example
 ```
+
+## Production Deployment
+
+The app is designed to run on **Google Cloud**:
+
+- **Cloud Run** — hosts the containerised app
+- **Cloud SQL (PostgreSQL)** — managed database
+- **Secret Manager** — stores API keys and credentials
+- **Cloud Scheduler** — triggers scheduled feed checks and ingestion runs
