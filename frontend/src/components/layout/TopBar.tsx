@@ -1,0 +1,71 @@
+import { Bell, LogOut, User, Menu } from "lucide-react";
+import { useAuth } from "@/contexts/AuthContext";
+import { useCards } from "@/hooks/use-cards";
+
+interface TopBarProps {
+  onMenuClick?: () => void;
+}
+
+export function TopBar({ onMenuClick }: TopBarProps) {
+  const { user, logout, isLoggingOut } = useAuth();
+  const { data: cards } = useCards();
+
+  // Count red-priority cards from the last 24 hours
+  const oneDayAgo = Date.now() - 24 * 60 * 60 * 1000;
+  const redCount = (cards ?? []).filter(
+    (c) => c.priority === "red" && new Date(c.created_at).getTime() >= oneDayAgo
+  ).length;
+
+  return (
+    <header className="flex h-14 items-center justify-between border-b border-border bg-background px-6">
+      <button
+        onClick={onMenuClick}
+        className="rounded-md p-2 text-muted-foreground hover:bg-muted md:hidden"
+      >
+        <Menu className="h-5 w-5" />
+      </button>
+      <div className="hidden md:block" />
+      <div className="flex items-center gap-4">
+        {/* Red-priority notification indicator */}
+        <button className="relative rounded-md p-2 text-muted-foreground hover:bg-muted">
+          <Bell className="h-5 w-5" />
+          {redCount > 0 && (
+            <span className="absolute -right-0.5 -top-0.5 flex h-4 min-w-4 items-center justify-center rounded-full bg-destructive px-1 text-[10px] font-bold text-destructive-foreground">
+              {redCount > 99 ? "99+" : redCount}
+            </span>
+          )}
+        </button>
+        {/* User info and logout */}
+        {user && (
+          <div className="flex items-center gap-3">
+            <div className="flex items-center gap-2 rounded-md p-2 text-sm">
+              <div className="flex h-7 w-7 items-center justify-center rounded-full bg-primary text-xs font-medium text-primary-foreground">
+                {user.name
+                  .split(" ")
+                  .map((n) => n[0])
+                  .join("")
+                  .toUpperCase()
+                  .slice(0, 2)}
+              </div>
+              <span className="hidden font-medium sm:inline">{user.name}</span>
+            </div>
+            <button
+              onClick={logout}
+              disabled={isLoggingOut}
+              className="rounded-md p-2 text-muted-foreground hover:bg-muted disabled:opacity-50"
+              title="Sign out"
+            >
+              <LogOut className="h-4 w-4" />
+            </button>
+          </div>
+        )}
+        {!user && (
+          <button className="flex items-center gap-2 rounded-md p-2 text-muted-foreground hover:bg-muted">
+            <User className="h-5 w-5" />
+          </button>
+        )}
+      </div>
+    </header>
+  );
+}
+
