@@ -42,7 +42,7 @@ class BriefingGenerator:
 
         Returns the created Briefing, or None if no cards were found.
         """
-        today = date.today()
+        today = datetime.now(timezone.utc).date()
 
         # Check if a briefing already exists for today
         existing = db.query(Briefing).filter(Briefing.date == today).first()

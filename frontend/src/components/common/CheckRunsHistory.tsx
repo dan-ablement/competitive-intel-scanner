@@ -117,6 +117,7 @@ function CheckRunRow({ run }: { run: CheckRun }) {
 export function CheckRunsHistory() {
   const { data: runs, isLoading, error } = useCheckRuns();
   const triggerCheck = useTriggerFeedCheck();
+  const [generateBriefing, setGenerateBriefing] = useState(false);
 
   return (
     <div className="mt-10">
@@ -127,18 +128,29 @@ export function CheckRunsHistory() {
             Recent feed check runs and their results.
           </p>
         </div>
-        <button
-          onClick={() => triggerCheck.mutate()}
-          disabled={triggerCheck.isPending}
-          className="inline-flex items-center gap-1.5 rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:bg-primary/90 disabled:opacity-50"
-        >
-          {triggerCheck.isPending ? (
-            <Loader2 className="h-4 w-4 animate-spin" />
-          ) : (
-            <Play className="h-4 w-4" />
-          )}
-          Run Feed Check Now
-        </button>
+        <div className="flex flex-col items-end gap-1.5">
+          <button
+            onClick={() => triggerCheck.mutate({ generateBriefing })}
+            disabled={triggerCheck.isPending}
+            className="inline-flex items-center gap-1.5 rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:bg-primary/90 disabled:opacity-50"
+          >
+            {triggerCheck.isPending ? (
+              <Loader2 className="h-4 w-4 animate-spin" />
+            ) : (
+              <Play className="h-4 w-4" />
+            )}
+            Run Feed Check Now
+          </button>
+          <label className="flex items-center gap-1.5 text-xs text-muted-foreground cursor-pointer">
+            <input
+              type="checkbox"
+              checked={generateBriefing}
+              onChange={(e) => setGenerateBriefing(e.target.checked)}
+              className="h-3.5 w-3.5 rounded border-border"
+            />
+            Also generate briefing
+          </label>
+        </div>
       </div>
 
       {/* Trigger error */}
@@ -154,6 +166,22 @@ export function CheckRunsHistory() {
         <div className="mt-3 flex items-start gap-2 rounded-md bg-green-50 px-4 py-3 text-sm text-green-700">
           <CheckCircle2 className="mt-0.5 h-4 w-4 shrink-0" />
           Feed check completed — {triggerCheck.data.feeds_checked} feeds checked, {triggerCheck.data.new_items_found} new items found.
+        </div>
+      )}
+
+      {/* Briefing generation error */}
+      {triggerCheck.isSuccess && triggerCheck.data.briefing_error && (
+        <div className="mt-2 flex items-start gap-2 rounded-md bg-yellow-50 px-4 py-3 text-sm text-yellow-700">
+          <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" />
+          Briefing generation failed: {triggerCheck.data.briefing_error}
+        </div>
+      )}
+
+      {/* Briefing generation success */}
+      {triggerCheck.isSuccess && triggerCheck.data.briefing_id && (
+        <div className="mt-2 flex items-start gap-2 rounded-md bg-blue-50 px-4 py-3 text-sm text-blue-700">
+          <CheckCircle2 className="mt-0.5 h-4 w-4 shrink-0" />
+          Morning briefing generated successfully.
         </div>
       )}
 

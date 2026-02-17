@@ -10,5 +10,7 @@ export interface CheckRun {
   new_items_found: number;
   cards_generated: number;
   error_log: string | null;
+  briefing_id?: string | null;
+  briefing_error?: string | null;
 }
 

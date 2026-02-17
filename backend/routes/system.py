@@ -32,13 +32,19 @@ class CheckRunResponse(BaseModel):
     new_items_found: int
     cards_generated: int
     error_log: Optional[str]
+    briefing_id: Optional[str] = None
+    briefing_error: Optional[str] = None
 
 
 # ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------
 
-def _check_run_to_response(cr: CheckRun) -> dict:
+def _check_run_to_response(
+    cr: CheckRun,
+    briefing_id: str | None = None,
+    briefing_error: str | None = None,
+) -> dict:
     """Serialize a CheckRun model to a dict matching CheckRunResponse."""
     return {
         "id": str(cr.id),
@@ -50,6 +56,8 @@ def _check_run_to_response(cr: CheckRun) -> dict:
         "new_items_found": cr.new_items_found,
         "cards_generated": cr.cards_generated,
         "error_log": cr.error_log,
+        "briefing_id": briefing_id,
+        "briefing_error": briefing_error,
     }
 
 
@@ -76,19 +84,23 @@ def trigger_check_feeds(
         check_run = checker.run()
 
         # Generate briefing if requested (e.g., morning 9:05 AM run)
+        briefing_id = None
+        briefing_error = None
+
         if generate_briefing:
             try:
                 generator = BriefingGenerator()
                 briefing = generator.generate_briefing(db)
                 if briefing:
+                    briefing_id = str(briefing.id)
                     logger.info("Morning briefing generated: %s", briefing.id)
                 else:
                     logger.info("No briefing generated (no recent cards or already exists)")
             except Exception as briefing_exc:
+                briefing_error = str(briefing_exc)
                 logger.exception("Briefing generation failed (feed check still succeeded)")
-                # Don't fail the whole check-feeds response; briefing is supplementary
 
-        return _check_run_to_response(check_run)
+        return _check_run_to_response(check_run, briefing_id=briefing_id, briefing_error=briefing_error)
     except Exception as exc:
         logger.exception("Feed check run failed unexpectedly")
         raise HTTPException(status_code=500, detail=f"Feed check failed: {str(exc)}")
