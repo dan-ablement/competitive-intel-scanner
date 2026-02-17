@@ -224,8 +224,19 @@ function CheckRunSection({ runs }: { runs: CheckRun[] }) {
           <div className="text-xs text-muted-foreground">Items found</div>
         </div>
         <div>
-          <div className="text-xl font-bold">{latest.cards_generated}</div>
-          <div className="text-xs text-muted-foreground">Cards generated</div>
+          {latest.cards_generated === 0 && latest.new_items_found > 0 ? (
+            <>
+              <div className="flex items-center justify-center gap-1 text-xl font-bold text-blue-600">
+                <Loader2 className="h-4 w-4 animate-spin" />
+              </div>
+              <div className="text-xs text-blue-600">Analysis in progress</div>
+            </>
+          ) : (
+            <>
+              <div className="text-xl font-bold">{latest.cards_generated}</div>
+              <div className="text-xs text-muted-foreground">Cards generated</div>
+            </>
+          )}
         </div>
       </div>
       <div className="mt-3 text-xs text-muted-foreground">
