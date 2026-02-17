@@ -8,6 +8,7 @@ from pydantic import BaseModel
 from sqlalchemy.orm import Session
 
 from backend.database import get_db
+from backend.utils import utc_isoformat
 from backend.models.check_run import CheckRun
 from backend.services.briefing_generator import BriefingGenerator
 from backend.services.feed_checker import FeedChecker
@@ -41,9 +42,9 @@ def _check_run_to_response(cr: CheckRun) -> dict:
     """Serialize a CheckRun model to a dict matching CheckRunResponse."""
     return {
         "id": str(cr.id),
-        "scheduled_time": cr.scheduled_time.isoformat() if cr.scheduled_time else None,
-        "started_at": cr.started_at.isoformat() if cr.started_at else None,
-        "completed_at": cr.completed_at.isoformat() if cr.completed_at else None,
+        "scheduled_time": utc_isoformat(cr.scheduled_time),
+        "started_at": utc_isoformat(cr.started_at),
+        "completed_at": utc_isoformat(cr.completed_at),
         "status": cr.status,
         "feeds_checked": cr.feeds_checked,
         "new_items_found": cr.new_items_found,

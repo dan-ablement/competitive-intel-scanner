@@ -18,6 +18,7 @@ from backend.models.augment_profile import AugmentProfile
 from backend.models.briefing import Briefing, BriefingCard
 from backend.models.competitor import Competitor
 from backend.prompts.briefing import build_briefing_prompt
+from backend.utils import utc_isoformat
 
 logger = logging.getLogger(__name__)
 
@@ -169,7 +170,7 @@ class BriefingGenerator:
                 "suggested_counter_moves": card.suggested_counter_moves,
                 "status": card.status,
                 "competitors": competitor_names,
-                "created_at": card.created_at.isoformat() if card.created_at else None,
+                "created_at": utc_isoformat(card.created_at),
             })
         return json.dumps(card_dicts, indent=2)
 

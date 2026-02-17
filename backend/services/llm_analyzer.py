@@ -18,6 +18,7 @@ from backend.models.augment_profile import AugmentProfile
 from backend.models.competitor import Competitor
 from backend.models.feed_item import FeedItem
 from backend.models.feed import RSSFeed
+from backend.utils import utc_isoformat
 from backend.prompts.feed_evaluation import build_feed_evaluation_prompt
 
 logger = logging.getLogger(__name__)
@@ -157,7 +158,7 @@ class LLMAnalyzer:
             item_title=item_title,
             item_content=item_content,
             item_url=item.url,
-            item_published_at=item.published_at.isoformat() if item.published_at else "Unknown",
+            item_published_at=utc_isoformat(item.published_at) or "Unknown",
         )
 
         raw_response = self._call_claude(prompt)

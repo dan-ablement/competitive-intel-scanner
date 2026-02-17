@@ -3,13 +3,14 @@
 from __future__ import annotations
 
 import uuid
-from datetime import datetime
+from datetime import datetime, timezone
 
 from authlib.integrations.starlette_client import OAuth
 from sqlalchemy.orm import Session
 
 from backend.config import settings
 from backend.models.user import User
+from backend.utils import utc_isoformat
 
 # Admin emails that get the 'admin' role on first login
 ADMIN_EMAILS = {
@@ -45,7 +46,7 @@ def get_or_create_user(db: Session, google_id: str, email: str, name: str) -> Us
         # Update name/email in case they changed in Google
         user.name = name
         user.email = email
-        user.updated_at = datetime.utcnow()
+        user.updated_at = datetime.now(timezone.utc)
         db.commit()
         db.refresh(user)
         return user
@@ -55,7 +56,7 @@ def get_or_create_user(db: Session, google_id: str, email: str, name: str) -> Us
     if user is not None:
         user.google_id = google_id
         user.name = name
-        user.updated_at = datetime.utcnow()
+        user.updated_at = datetime.now(timezone.utc)
         db.commit()
         db.refresh(user)
         return user
@@ -83,6 +84,6 @@ def user_to_dict(user: User) -> dict:
         "name": user.name,
         "role": user.role,
         "google_id": user.google_id,
-        "created_at": user.created_at.isoformat() if user.created_at else None,
-        "updated_at": user.updated_at.isoformat() if user.updated_at else None,
+        "created_at": utc_isoformat(user.created_at),
+        "updated_at": utc_isoformat(user.updated_at),
     }

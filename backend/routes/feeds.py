@@ -13,6 +13,7 @@ from sqlalchemy.orm import Session, joinedload
 
 from backend.database import get_db, SessionLocal
 from backend.models.feed import RSSFeed
+from backend.utils import utc_isoformat
 from backend.models.feed_item import FeedItem
 from backend.models.competitor import Competitor
 from backend.models.twitter_source_config import TwitterSourceConfig
@@ -137,13 +138,13 @@ def _feed_to_response(feed: RSSFeed) -> dict:
         "feed_type": feed.feed_type or "rss",
         "css_selector": feed.css_selector,
         "is_active": feed.is_active,
-        "last_checked_at": feed.last_checked_at.isoformat() if feed.last_checked_at else None,
-        "last_successful_at": feed.last_successful_at.isoformat() if feed.last_successful_at else None,
+        "last_checked_at": utc_isoformat(feed.last_checked_at),
+        "last_successful_at": utc_isoformat(feed.last_successful_at),
         "error_count": feed.error_count,
         "last_error": feed.last_error,
         "created_by": str(feed.created_by),
-        "created_at": feed.created_at.isoformat() if feed.created_at else None,
-        "updated_at": feed.updated_at.isoformat() if feed.updated_at else None,
+        "created_at": utc_isoformat(feed.created_at),
+        "updated_at": utc_isoformat(feed.updated_at),
         "twitter_config": twitter_config_data,
         "x_username": twitter_config_data["x_username"] if twitter_config_data else None,
         "x_user_id": twitter_config_data["x_user_id"] if twitter_config_data else None,

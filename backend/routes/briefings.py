@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import uuid
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Optional
 
 from fastapi import APIRouter, Depends, HTTPException
@@ -10,6 +10,7 @@ from sqlalchemy.orm import Session, joinedload
 
 from backend.database import get_db
 from backend.models.briefing import Briefing
+from backend.utils import utc_isoformat
 
 router = APIRouter()
 
@@ -71,8 +72,8 @@ def _briefing_to_list_item(briefing: Briefing) -> dict:
         "date": briefing.date.isoformat() if briefing.date else None,
         "status": briefing.status,
         "card_count": card_count,
-        "created_at": briefing.created_at.isoformat() if briefing.created_at else None,
-        "updated_at": briefing.updated_at.isoformat() if briefing.updated_at else None,
+        "created_at": utc_isoformat(briefing.created_at),
+        "updated_at": utc_isoformat(briefing.updated_at),
     }
 
 
@@ -97,10 +98,10 @@ def _briefing_to_response(briefing: Briefing) -> dict:
         "raw_llm_output": briefing.raw_llm_output,
         "status": briefing.status,
         "approved_by": str(briefing.approved_by) if briefing.approved_by else None,
-        "approved_at": briefing.approved_at.isoformat() if briefing.approved_at else None,
+        "approved_at": utc_isoformat(briefing.approved_at),
         "cards": cards,
-        "created_at": briefing.created_at.isoformat() if briefing.created_at else None,
-        "updated_at": briefing.updated_at.isoformat() if briefing.updated_at else None,
+        "created_at": utc_isoformat(briefing.created_at),
+        "updated_at": utc_isoformat(briefing.updated_at),
     }
 
 
@@ -193,7 +194,7 @@ def update_briefing_status(
 
     # If approving, record the timestamp (no auth enforcement yet per task spec)
     if body.status == "approved":
-        briefing.approved_at = datetime.utcnow()
+        briefing.approved_at = datetime.now(timezone.utc)
 
     db.commit()
     db.refresh(briefing)
