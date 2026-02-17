@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import json
 import logging
+import random
 import time
 import uuid
 from datetime import datetime
@@ -31,8 +32,10 @@ VALID_EVENT_TYPES = {
 VALID_PRIORITIES = {"red", "yellow", "green"}
 
 MODEL = "claude-sonnet-4-20250514"
-MAX_RETRIES = 3
-BASE_DELAY = 2  # seconds
+MAX_RETRIES = 5
+BASE_DELAY = 15  # seconds
+RATE_LIMIT_MIN_DELAY = 60  # minimum seconds to wait on rate limit (per-minute quota)
+INTER_ITEM_DELAY = 3  # seconds between consecutive LLM calls
 
 
 class LLMAnalyzer:
@@ -65,7 +68,11 @@ class LLMAnalyzer:
         competitor_profiles_text = self._load_competitor_profiles(db)
 
         cards_created = 0
-        for item in items:
+        for idx, item in enumerate(items):
+            # Inter-item delay to avoid bursting the rate limit
+            if idx > 0:
+                logger.debug("Inter-item delay: %ds before item %d/%d", INTER_ITEM_DELAY, idx + 1, len(items))
+                time.sleep(INTER_ITEM_DELAY)
             try:
                 created = self._process_single_item(
                     db, item, augment_profile_text, competitor_profiles_text, check_run_id,
@@ -196,7 +203,11 @@ class LLMAnalyzer:
         return True
 
     def _call_claude(self, prompt: str) -> str:
-        """Call Claude API with exponential backoff retry."""
+        """Call Claude API with rate-limit-aware retry.
+
+        For RateLimitError (429): waits at least 60s (per-minute quota) plus jitter.
+        For other APIErrors: uses exponential backoff with BASE_DELAY.
+        """
         for attempt in range(MAX_RETRIES):
             try:
                 message = self.client.messages.create(
@@ -213,8 +224,12 @@ class LLMAnalyzer:
                 return response_text
             except anthropic.RateLimitError:
                 if attempt < MAX_RETRIES - 1:
-                    delay = BASE_DELAY * (2 ** attempt)
-                    logger.warning("Rate limited, retrying in %ds (attempt %d/%d)", delay, attempt + 1, MAX_RETRIES)
+                    # Per-minute rate limit — wait at least 60s plus jitter
+                    delay = RATE_LIMIT_MIN_DELAY + random.uniform(0, 5)
+                    logger.warning(
+                        "Rate limited (429), waiting %.1fs (attempt %d/%d)",
+                        delay, attempt + 1, MAX_RETRIES,
+                    )
                     time.sleep(delay)
                 else:
                     raise

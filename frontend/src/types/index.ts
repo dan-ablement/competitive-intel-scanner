@@ -13,7 +13,7 @@ export type {
   CardStatus,
 } from "./analysis-card";
 export type { Briefing, BriefingCard, BriefingStatus } from "./briefing";
-export type { CheckRun, CheckRunStatus } from "./check-run";
+export type { CheckRun, CheckRunStatus, AnalysisStatus } from "./check-run";
 export type {
   ProfileUpdateSuggestion,
   SuggestionTargetType,

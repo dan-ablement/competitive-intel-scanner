@@ -1,5 +1,7 @@
 export type CheckRunStatus = "running" | "completed" | "failed";
 
+export type AnalysisStatus = "pending" | "complete";
+
 export interface CheckRun {
   id: string;
   scheduled_time: string;
@@ -12,5 +14,6 @@ export interface CheckRun {
   error_log: string | null;
   briefing_id?: string | null;
   briefing_error?: string | null;
+  analysis_status?: AnalysisStatus | null;
 }
 
