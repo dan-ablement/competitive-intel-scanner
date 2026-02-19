@@ -62,6 +62,16 @@ async def google_callback(request: Request, db: Session = Depends(get_db)):
 
     user = get_or_create_user(db, google_id=google_id, email=email, name=name)
 
+    # Store OAuth tokens for Google Docs integration
+    refresh_token = token.get("refresh_token")
+    access_token = token.get("access_token")
+    if refresh_token:
+        user.google_refresh_token = refresh_token
+    if access_token:
+        user.google_access_token = access_token
+    if refresh_token or access_token:
+        db.commit()
+
     # Store user ID in session
     request.session["user_id"] = str(user.id)
 

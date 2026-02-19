@@ -9,7 +9,7 @@ from fastapi.staticfiles import StaticFiles
 from starlette.middleware.sessions import SessionMiddleware
 
 from backend.config import settings
-from backend.routes import auth, feeds, competitors, augment_profile, cards, briefings, suggestions, system
+from backend.routes import auth, feeds, competitors, augment_profile, cards, briefings, suggestions, system, content_outputs, content_templates
 
 logger = logging.getLogger(__name__)
 
@@ -43,6 +43,8 @@ app.include_router(cards.router, prefix="/api/cards", tags=["cards"])
 app.include_router(briefings.router, prefix="/api/briefings", tags=["briefings"])
 app.include_router(suggestions.router, prefix="/api/suggestions", tags=["suggestions"])
 app.include_router(system.router, prefix="/api", tags=["system"])
+app.include_router(content_outputs.router, prefix="/api/content-outputs", tags=["content-outputs"])
+app.include_router(content_templates.router, prefix="/api/content-templates", tags=["content-templates"])
 
 # Static file serving with SPA fallback
 static_dir = Path("./static")
