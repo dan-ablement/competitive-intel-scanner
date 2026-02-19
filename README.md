@@ -1,6 +1,6 @@
 # Competitive Intelligence Scanner
 
-A competitive intelligence scanning app for Augment Code's GTM team. Monitors competitor activity across **RSS feeds**, **web pages** (via Crawl4AI), and **Twitter/X accounts**, then uses Claude to evaluate developments and surface insights through a collaborative review workflow.
+A competitive intelligence scanning app for Augment Code's GTM team. Monitors competitor activity across **RSS feeds**, **web pages** (via Crawl4AI), and **Twitter/X accounts**, then uses Claude to evaluate developments and surface insights through a collaborative review workflow. Includes a **content generation system** that produces battle cards and competitive briefs, with approval workflows and automatic publishing to Google Docs.
 
 ## Tech Stack
 
@@ -20,6 +20,35 @@ A competitive intelligence scanning app for Augment Code's GTM team. Monitors co
 | **Twitter/X** | Polls the X API v2 for new tweets from monitored accounts using Bearer token auth | `twitter_ingester.py` |
 
 All three source types feed into the same LLM analysis pipeline — items are scored for relevance and surfaced as analysis cards in the review UI.
+
+## Features
+
+### Content Generation (Battle Cards)
+
+Generate competitive battle cards from collected intelligence using Claude:
+
+1. **Generate draft** — select a competitor and template, then kick off LLM generation. The system pulls recent analysis cards as context and produces structured Markdown content.
+2. **Review** — review the generated draft in the UI. Edit inline or regenerate sections as needed.
+3. **Approve** — an admin approves the final content, which triggers automatic publishing.
+4. **Publish to Google Docs** — approved content is created (or updated) as a Google Doc in a shared Drive folder, using the approving user's OAuth credentials.
+
+The dashboard highlights **stale or missing content** per competitor so the team knows what needs attention.
+
+### Content Templates
+
+Templates are configurable in **Settings → Content Templates**. Each template defines a list of sections (title, description, prompt hint) that guide the LLM when generating content. Templates can be reused across competitors.
+
+### Briefing Generation
+
+Feed checks support a manual "Also generate briefing" option. When enabled, the system produces a summary briefing alongside the normal per-item analysis.
+
+### LLM Rate Limiting
+
+LLM calls are processed as background tasks with automatic retry on rate limits (60 s back-off) and configurable inter-item delays to stay within API quotas.
+
+### UTC Timestamps
+
+All API timestamps include an explicit UTC offset (`+00:00`) for unambiguous time handling across clients.
 
 ## Prerequisites
 
@@ -95,17 +124,29 @@ docker-compose up --build
 │   │   ├── feed_item.py               # Ingested content items
 │   │   ├── twitter_source_config.py   # Twitter/X per-source settings
 │   │   ├── analysis_card.py           # LLM-generated analysis cards
+│   │   ├── content_template.py        # Content generation templates
+│   │   ├── content_output.py          # Generated content outputs
+│   │   ├── system_setting.py          # App-wide settings (e.g. Drive folder)
 │   │   └── ...
 │   ├── services/
 │   │   ├── feed_checker.py            # RSS feed ingestion
 │   │   ├── web_scraper.py             # Crawl4AI web scraping
 │   │   ├── twitter_ingester.py        # X API v2 ingestion
 │   │   ├── llm_analyzer.py            # Claude analysis pipeline
+│   │   ├── content_generator.py       # Battle card / content generation
+│   │   ├── google_docs_service.py     # Google Docs publish integration
 │   │   └── ...
 │   ├── routes/                        # API route handlers
-│   └── alembic/                       # Database migrations
+│   │   ├── content_outputs.py         # Content generation endpoints
+│   │   ├── content_templates.py       # Template CRUD endpoints
+│   │   └── ...
+│   └── alembic/                       # Database migrations (001–004)
 ├── frontend/                          # React frontend
 │   └── src/
+│       ├── pages/
+│       │   ├── ContentOutputs.tsx     # Content generation list view
+│       │   ├── ContentOutputDetail.tsx # Content review / approve view
+│       │   └── ...
 ├── Dockerfile                         # Multi-stage build (includes Playwright/Chromium)
 ├── docker-compose.yml
 ├── requirements.txt
@@ -120,3 +161,24 @@ The app is designed to run on **Google Cloud**:
 - **Cloud SQL (PostgreSQL)** — managed database
 - **Secret Manager** — stores API keys and credentials
 - **Cloud Scheduler** — triggers scheduled feed checks and ingestion runs
+
+## Database Migrations
+
+| Migration | Description |
+|-----------|-------------|
+| `001_initial_schema` | Core tables (feeds, feed items, analysis cards, users) |
+| `002_add_feed_type` | Feed type column for multi-source support |
+| `003_add_twitter_support` | Twitter/X source configuration |
+| `004_content_generation` | Content templates, content outputs, and system settings tables |
+
+## Testing
+
+The project has **81 backend tests** and **21 frontend tests**.
+
+```bash
+# Run backend tests
+docker-compose exec app python -m pytest backend/tests/ -v
+
+# Run frontend tests
+cd frontend && npm test
+```
