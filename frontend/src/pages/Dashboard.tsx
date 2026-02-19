@@ -1,9 +1,12 @@
+import { useState } from "react";
 import { Link } from "react-router-dom";
 import { useBriefings } from "@/hooks/use-briefings";
 import { useCards } from "@/hooks/use-cards";
 import { useCheckRuns } from "@/hooks/use-system";
 import { useSuggestions } from "@/hooks/use-suggestions";
 import { useCompetitors } from "@/hooks/use-competitors";
+import { useStaleContent, useGenerateDraft } from "@/hooks/use-content-outputs";
+import type { StaleContentItem } from "@/api/content-outputs";
 import type { AnalysisCard, Priority, CheckRun, Briefing } from "@/types";
 import { cn } from "@/lib/utils";
 import {
@@ -19,6 +22,7 @@ import {
   Lightbulb,
   Eye,
   RefreshCw,
+  Leaf,
 } from "lucide-react";
 
 // ---------------------------------------------------------------------------
@@ -404,6 +408,108 @@ function RecentCardsSection({ cards }: { cards: AnalysisCard[] }) {
 }
 
 // ---------------------------------------------------------------------------
+// Stale Content Section
+// ---------------------------------------------------------------------------
+
+function StaleContentCard({ item }: { item: StaleContentItem }) {
+  const generateDraft = useGenerateDraft();
+  const [generating, setGenerating] = useState(false);
+
+  const handleGenerate = async () => {
+    setGenerating(true);
+    try {
+      await generateDraft.mutateAsync({
+        competitorId: item.competitor_id,
+        templateId: item.template_id,
+      });
+    } finally {
+      setGenerating(false);
+    }
+  };
+
+  const staleness = (() => {
+    if (!item.last_output_at) return "Never generated";
+    const days = Math.floor(
+      (Date.now() - new Date(item.last_output_at).getTime()) / (1000 * 60 * 60 * 24)
+    );
+    return `${days} day${days !== 1 ? "s" : ""} out of date`;
+  })();
+
+  return (
+    <div className="flex items-center justify-between rounded-md border border-border px-4 py-3">
+      <div className="min-w-0 flex-1">
+        <div className="flex items-center gap-2">
+          <span className="text-sm font-semibold">{item.competitor_name}</span>
+          <span className="rounded-full bg-muted px-2 py-0.5 text-xs font-medium text-muted-foreground">
+            {item.content_type.replace(/_/g, " ")}
+          </span>
+        </div>
+        <p className="mt-0.5 text-xs text-muted-foreground">{staleness}</p>
+      </div>
+      <button
+        onClick={handleGenerate}
+        disabled={generating}
+        className="inline-flex items-center gap-1.5 rounded-md bg-primary px-3 py-1.5 text-sm font-medium text-primary-foreground hover:bg-primary/90 disabled:opacity-50"
+      >
+        {generating ? (
+          <Loader2 className="h-3.5 w-3.5 animate-spin" />
+        ) : (
+          <RefreshCw className="h-3.5 w-3.5" />
+        )}
+        Generate Draft
+      </button>
+    </div>
+  );
+}
+
+function StaleContentSection() {
+  const { data: staleItems, isLoading } = useStaleContent();
+
+  if (isLoading) {
+    return (
+      <div className="rounded-lg border border-border bg-card p-6">
+        <div className="flex items-center gap-2">
+          <Leaf className="h-5 w-5 text-muted-foreground" />
+          <h2 className="text-lg font-semibold">Content Freshness</h2>
+        </div>
+        <div className="mt-4 flex justify-center">
+          <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="rounded-lg border border-border bg-card p-6">
+      <div className="flex items-center gap-2">
+        <Leaf className="h-5 w-5 text-muted-foreground" />
+        <h2 className="text-lg font-semibold">Content Freshness</h2>
+        {staleItems && staleItems.length > 0 && (
+          <span className="rounded-full bg-amber-100 px-2 py-0.5 text-xs font-semibold text-amber-800">
+            {staleItems.length}
+          </span>
+        )}
+      </div>
+      {!staleItems || staleItems.length === 0 ? (
+        <div className="mt-3 flex items-center gap-2 text-sm text-green-700">
+          <CheckCircle2 className="h-4 w-4" />
+          All content up to date
+        </div>
+      ) : (
+        <div className="mt-3 space-y-2">
+          {staleItems.map((item) => (
+            <StaleContentCard
+              key={`${item.competitor_id}-${item.template_id}`}
+              item={item}
+            />
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
 // Main Dashboard
 // ---------------------------------------------------------------------------
 
@@ -493,6 +599,9 @@ export default function Dashboard() {
         />
         <RecentCardsSection cards={cards ?? []} />
       </div>
+
+      {/* Content Freshness */}
+      <StaleContentSection />
     </div>
   );
 }

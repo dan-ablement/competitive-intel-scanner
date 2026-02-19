@@ -1,8 +1,14 @@
 import { useState } from "react";
-import { useSettings } from "@/hooks/use-system";
+import { useSettings, useUpdateSettings } from "@/hooks/use-system";
 import { useSuggestions, useApproveSuggestion, useRejectSuggestion } from "@/hooks/use-suggestions";
 import { useTriggerProfileReview } from "@/hooks/use-system";
-import type { ProfileUpdateSuggestion } from "@/types";
+import {
+  useContentTemplates,
+  useCreateContentTemplate,
+  useUpdateContentTemplate,
+  useDeleteContentTemplate,
+} from "@/hooks/use-content-templates";
+import type { ProfileUpdateSuggestion, ContentTemplate, ContentTemplateSection } from "@/types";
 import { cn } from "@/lib/utils";
 import {
   Clock,
@@ -16,6 +22,13 @@ import {
   Building2,
   Users,
   Tag,
+  FileText,
+  Plus,
+  Trash2,
+  ChevronDown,
+  ChevronRight,
+  Save,
+  FolderOpen,
 } from "lucide-react";
 
 // ---------------------------------------------------------------------------
@@ -303,6 +316,417 @@ function SuggestionsSection() {
 }
 
 // ---------------------------------------------------------------------------
+// Google Drive Folder ID Section
+// ---------------------------------------------------------------------------
+
+function GoogleDriveFolderSection({ settings }: { settings: Record<string, unknown> }) {
+  const updateSettings = useUpdateSettings();
+  const [folderId, setFolderId] = useState(
+    (settings.google_drive_folder_id as string) ?? ""
+  );
+  const [saved, setSaved] = useState(false);
+
+  const handleSave = () => {
+    updateSettings.mutate(
+      { ...settings, google_drive_folder_id: folderId },
+      {
+        onSuccess: () => {
+          setSaved(true);
+          setTimeout(() => setSaved(false), 2000);
+        },
+      }
+    );
+  };
+
+  return (
+    <section className="rounded-lg border border-border p-6">
+      <div className="flex items-center gap-2 mb-4">
+        <FolderOpen className="h-5 w-5 text-muted-foreground" />
+        <h2 className="text-lg font-semibold">Google Drive</h2>
+      </div>
+      <p className="text-sm text-muted-foreground mb-4">
+        Folder ID for storing generated content documents in Google Drive.
+      </p>
+      <div className="flex items-center gap-3">
+        <input
+          type="text"
+          value={folderId}
+          onChange={(e) => setFolderId(e.target.value)}
+          placeholder="Enter Google Drive folder ID"
+          className="flex-1 rounded-md border border-input bg-background px-3 py-2 text-sm placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring"
+        />
+        <button
+          onClick={handleSave}
+          disabled={updateSettings.isPending}
+          className="inline-flex items-center gap-1.5 rounded-md bg-primary px-3 py-2 text-sm font-medium text-primary-foreground hover:bg-primary/90 disabled:opacity-50"
+        >
+          {updateSettings.isPending ? (
+            <Loader2 className="h-3.5 w-3.5 animate-spin" />
+          ) : saved ? (
+            <CheckCircle2 className="h-3.5 w-3.5" />
+          ) : (
+            <Save className="h-3.5 w-3.5" />
+          )}
+          {saved ? "Saved" : "Save"}
+        </button>
+      </div>
+    </section>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Content Templates Section
+// ---------------------------------------------------------------------------
+
+function TemplateEditor({
+  template,
+  onSave,
+  onCancel,
+  isSaving,
+}: {
+  template: Omit<ContentTemplate, "id" | "created_at" | "updated_at"> & { id?: string };
+  onSave: (t: Omit<ContentTemplate, "id" | "created_at" | "updated_at">) => void;
+  onCancel: () => void;
+  isSaving: boolean;
+}) {
+  const [name, setName] = useState(template.name);
+  const [contentType, setContentType] = useState(template.content_type);
+  const [description, setDescription] = useState(template.description);
+  const [docNamePattern, setDocNamePattern] = useState(template.doc_name_pattern);
+  const [sections, setSections] = useState<ContentTemplateSection[]>(
+    template.sections ?? []
+  );
+  const isActive = template.is_active;
+
+  const addSection = () => {
+    setSections([...sections, { title: "", description: "", prompt_hint: "" }]);
+  };
+
+  const removeSection = (index: number) => {
+    setSections(sections.filter((_, i) => i !== index));
+  };
+
+  const updateSection = (
+    index: number,
+    field: keyof ContentTemplateSection,
+    value: string
+  ) => {
+    setSections(
+      sections.map((s, i) => (i === index ? { ...s, [field]: value } : s))
+    );
+  };
+
+  const handleSave = () => {
+    onSave({
+      name,
+      content_type: contentType,
+      description,
+      doc_name_pattern: docNamePattern,
+      sections,
+      is_active: isActive,
+    });
+  };
+
+  return (
+    <div className="mt-3 space-y-4 rounded-md border border-border bg-muted/30 p-4">
+      <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+        <div>
+          <label className="text-xs font-medium text-muted-foreground">
+            Template Name
+          </label>
+          <input
+            type="text"
+            value={name}
+            onChange={(e) => setName(e.target.value)}
+            className="mt-1 w-full rounded-md border border-input bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-ring"
+          />
+        </div>
+        <div>
+          <label className="text-xs font-medium text-muted-foreground">
+            Content Type
+          </label>
+          <input
+            type="text"
+            value={contentType}
+            onChange={(e) => setContentType(e.target.value)}
+            className="mt-1 w-full rounded-md border border-input bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-ring"
+          />
+        </div>
+      </div>
+
+      <div>
+        <label className="text-xs font-medium text-muted-foreground">
+          Description
+        </label>
+        <textarea
+          value={description}
+          onChange={(e) => setDescription(e.target.value)}
+          rows={2}
+          className="mt-1 w-full rounded-md border border-input bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-ring"
+        />
+      </div>
+
+      <div>
+        <label className="text-xs font-medium text-muted-foreground">
+          Doc Name Pattern
+        </label>
+        <input
+          type="text"
+          value={docNamePattern}
+          onChange={(e) => setDocNamePattern(e.target.value)}
+          placeholder="{competitor} - Battle Card"
+          className="mt-1 w-full rounded-md border border-input bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-ring"
+        />
+        <p className="mt-1 text-xs text-muted-foreground">
+          Use <code className="rounded bg-muted px-1">{"{competitor}"}</code> as
+          a placeholder for the competitor name.
+        </p>
+      </div>
+
+      {/* Sections */}
+      <div>
+        <div className="flex items-center justify-between mb-2">
+          <label className="text-xs font-medium text-muted-foreground">
+            Sections ({sections.length})
+          </label>
+          <button
+            onClick={addSection}
+            className="inline-flex items-center gap-1 rounded-md border border-input px-2 py-1 text-xs font-medium hover:bg-accent"
+          >
+            <Plus className="h-3 w-3" /> Add Section
+          </button>
+        </div>
+        <div className="space-y-3">
+          {sections.map((section, i) => (
+            <div
+              key={i}
+              className="rounded-md border border-border bg-background p-3"
+            >
+              <div className="flex items-center justify-between mb-2">
+                <span className="text-xs font-semibold text-muted-foreground">
+                  Section {i + 1}
+                </span>
+                <button
+                  onClick={() => removeSection(i)}
+                  className="inline-flex items-center gap-1 rounded-md px-2 py-1 text-xs text-red-600 hover:bg-red-50"
+                >
+                  <Trash2 className="h-3 w-3" /> Remove
+                </button>
+              </div>
+              <div className="space-y-2">
+                <input
+                  type="text"
+                  value={section.title}
+                  onChange={(e) => updateSection(i, "title", e.target.value)}
+                  placeholder="Section title"
+                  className="w-full rounded-md border border-input bg-background px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-ring"
+                />
+                <textarea
+                  value={section.description}
+                  onChange={(e) =>
+                    updateSection(i, "description", e.target.value)
+                  }
+                  placeholder="Section description"
+                  rows={2}
+                  className="w-full rounded-md border border-input bg-background px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-ring"
+                />
+                <textarea
+                  value={section.prompt_hint}
+                  onChange={(e) =>
+                    updateSection(i, "prompt_hint", e.target.value)
+                  }
+                  placeholder="Prompt hint for AI generation"
+                  rows={2}
+                  className="w-full rounded-md border border-input bg-background px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-ring"
+                />
+              </div>
+            </div>
+          ))}
+        </div>
+      </div>
+
+      {/* Actions */}
+      <div className="flex items-center justify-end gap-2 pt-2">
+        <button
+          onClick={onCancel}
+          className="rounded-md border border-input px-3 py-1.5 text-sm font-medium hover:bg-accent"
+        >
+          Cancel
+        </button>
+        <button
+          onClick={handleSave}
+          disabled={isSaving || !name.trim() || !contentType.trim()}
+          className="inline-flex items-center gap-1.5 rounded-md bg-primary px-3 py-1.5 text-sm font-medium text-primary-foreground hover:bg-primary/90 disabled:opacity-50"
+        >
+          {isSaving ? (
+            <Loader2 className="h-3.5 w-3.5 animate-spin" />
+          ) : (
+            <Save className="h-3.5 w-3.5" />
+          )}
+          Save
+        </button>
+      </div>
+    </div>
+  );
+}
+
+function ContentTemplatesSection() {
+  const { data: templates, isLoading } = useContentTemplates();
+  const createTemplate = useCreateContentTemplate();
+  const updateTemplate = useUpdateContentTemplate();
+  const deleteTemplate = useDeleteContentTemplate();
+  const [expandedId, setExpandedId] = useState<string | null>(null);
+  const [isCreating, setIsCreating] = useState(false);
+
+  const handleToggleActive = (template: ContentTemplate) => {
+    updateTemplate.mutate({
+      id: template.id,
+      template: { is_active: !template.is_active },
+    });
+  };
+
+  return (
+    <section className="rounded-lg border border-border p-6">
+      <div className="flex items-center justify-between mb-4">
+        <div className="flex items-center gap-2">
+          <FileText className="h-5 w-5 text-muted-foreground" />
+          <h2 className="text-lg font-semibold">Content Templates</h2>
+        </div>
+        <button
+          onClick={() => {
+            setIsCreating(true);
+            setExpandedId(null);
+          }}
+          className="inline-flex items-center gap-1.5 rounded-md border border-input px-3 py-1.5 text-sm font-medium hover:bg-accent"
+        >
+          <Plus className="h-3.5 w-3.5" /> Add Template
+        </button>
+      </div>
+
+      {isLoading && (
+        <div className="flex justify-center py-8">
+          <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
+        </div>
+      )}
+
+      {isCreating && (
+        <TemplateEditor
+          template={{
+            name: "",
+            content_type: "",
+            description: "",
+            doc_name_pattern: "",
+            sections: [],
+            is_active: true,
+          }}
+          onSave={(t) => {
+            createTemplate.mutate(t, {
+              onSuccess: () => setIsCreating(false),
+            });
+          }}
+          onCancel={() => setIsCreating(false)}
+          isSaving={createTemplate.isPending}
+        />
+      )}
+
+      {templates && templates.length === 0 && !isCreating && (
+        <p className="text-sm text-muted-foreground">
+          No content templates yet. Add one to get started.
+        </p>
+      )}
+
+      {templates && templates.length > 0 && (
+        <div className="space-y-2">
+          {templates.map((template) => (
+            <div key={template.id}>
+              <div
+                className="flex items-center justify-between rounded-md border border-border px-4 py-3 cursor-pointer hover:bg-muted/30"
+                onClick={() =>
+                  setExpandedId(
+                    expandedId === template.id ? null : template.id
+                  )
+                }
+              >
+                <div className="flex items-center gap-3">
+                  {expandedId === template.id ? (
+                    <ChevronDown className="h-4 w-4 text-muted-foreground" />
+                  ) : (
+                    <ChevronRight className="h-4 w-4 text-muted-foreground" />
+                  )}
+                  <div>
+                    <span className="text-sm font-semibold">
+                      {template.name}
+                    </span>
+                    <div className="flex items-center gap-2 mt-0.5">
+                      <span className="rounded-full bg-muted px-2 py-0.5 text-xs font-medium text-muted-foreground">
+                        {template.content_type.replace(/_/g, " ")}
+                      </span>
+                      <span className="text-xs text-muted-foreground">
+                        {template.sections?.length ?? 0} section
+                        {(template.sections?.length ?? 0) !== 1 ? "s" : ""}
+                      </span>
+                    </div>
+                  </div>
+                </div>
+                <div className="flex items-center gap-3">
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      handleToggleActive(template);
+                    }}
+                    className={cn(
+                      "relative inline-flex h-5 w-9 items-center rounded-full transition-colors",
+                      template.is_active ? "bg-green-500" : "bg-gray-300"
+                    )}
+                  >
+                    <span
+                      className={cn(
+                        "inline-block h-3.5 w-3.5 rounded-full bg-white transition-transform",
+                        template.is_active
+                          ? "translate-x-4.5"
+                          : "translate-x-0.5"
+                      )}
+                    />
+                  </button>
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      if (
+                        confirm(
+                          `Delete template "${template.name}"?`
+                        )
+                      ) {
+                        deleteTemplate.mutate(template.id);
+                      }
+                    }}
+                    className="rounded-md p-1 text-muted-foreground hover:bg-red-50 hover:text-red-600"
+                  >
+                    <Trash2 className="h-3.5 w-3.5" />
+                  </button>
+                </div>
+              </div>
+              {expandedId === template.id && (
+                <TemplateEditor
+                  template={template}
+                  onSave={(t) => {
+                    updateTemplate.mutate(
+                      { id: template.id, template: t },
+                      { onSuccess: () => setExpandedId(null) }
+                    );
+                  }}
+                  onCancel={() => setExpandedId(null)}
+                  isSaving={updateTemplate.isPending}
+                />
+              )}
+            </div>
+          ))}
+        </div>
+      )}
+    </section>
+  );
+}
+
+// ---------------------------------------------------------------------------
 // Main Page
 // ---------------------------------------------------------------------------
 
@@ -327,6 +751,8 @@ export default function Settings() {
           <SuggestionsSection />
           <ScheduleSection settings={settings as Record<string, unknown>} />
           <ContentTypesSection contentTypes={(settings as Record<string, unknown>).content_types as string[] ?? []} />
+          <ContentTemplatesSection />
+          <GoogleDriveFolderSection settings={settings as Record<string, unknown>} />
           <AdminsSection admins={(settings as Record<string, unknown>).admins as string[] ?? []} />
         </div>
       )}
