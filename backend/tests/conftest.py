@@ -128,3 +128,98 @@ def make_twitter_config():
         )
     return _make
 
+
+@pytest.fixture
+def make_competitor():
+    """Factory to create mock Competitor objects."""
+    def _make(name="Test Competitor", is_active=True, content_types=None):
+        return SimpleNamespace(
+            id=uuid.uuid4(),
+            name=name,
+            is_active=is_active,
+            content_types=content_types or [],
+            created_at=datetime.now(timezone.utc),
+            updated_at=datetime.now(timezone.utc),
+        )
+    return _make
+
+
+@pytest.fixture
+def make_user():
+    """Factory to create mock User objects."""
+    def _make(role="viewer", email="test@example.com", name="Test User"):
+        return SimpleNamespace(
+            id=uuid.uuid4(),
+            email=email,
+            name=name,
+            role=role,
+            created_at=datetime.now(timezone.utc),
+            updated_at=datetime.now(timezone.utc),
+        )
+    return _make
+
+
+@pytest.fixture
+def make_content_output():
+    """Factory to create mock ContentOutput objects."""
+    def _make(
+        competitor=None,
+        content='{"key": "val"}',
+        status="draft",
+        template_id=None,
+        content_type="Competitive Battle Card",
+        title="Test Output",
+        **kwargs,
+    ):
+        comp = competitor or SimpleNamespace(id=uuid.uuid4(), name="Test Competitor")
+        defaults = dict(
+            id=uuid.uuid4(),
+            competitor_id=comp.id,
+            competitor=comp,
+            content_type=content_type,
+            title=title,
+            content=content,
+            sections=None,
+            source_card_ids=None,
+            version=1,
+            status=status,
+            template_id=template_id or uuid.uuid4(),
+            google_doc_id=None,
+            google_doc_url=None,
+            approved_by=None,
+            approved_at=None,
+            published_at=None,
+            error_message=None,
+            raw_llm_output=None,
+            created_at=datetime.now(timezone.utc),
+            updated_at=datetime.now(timezone.utc),
+        )
+        defaults.update(kwargs)
+        return SimpleNamespace(**defaults)
+    return _make
+
+
+@pytest.fixture
+def make_content_template():
+    """Factory to create mock ContentTemplate objects."""
+    def _make(
+        content_type="Competitive Battle Card",
+        name="Battle Card Template",
+        description="A template for battle cards",
+        sections=None,
+        doc_name_pattern=None,
+        is_active=True,
+    ):
+        return SimpleNamespace(
+            id=uuid.uuid4(),
+            content_type=content_type,
+            name=name,
+            description=description,
+            sections=sections,
+            doc_name_pattern=doc_name_pattern,
+            is_active=is_active,
+            created_at=datetime.now(timezone.utc),
+            updated_at=datetime.now(timezone.utc),
+        )
+    return _make
+
