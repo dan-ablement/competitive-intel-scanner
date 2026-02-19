@@ -20,4 +20,8 @@ export type {
   SuggestionStatus,
 } from "./profile-suggestion";
 export type { ContentOutput, ContentOutputStatus } from "./content-output";
+export type {
+  ContentTemplate,
+  ContentTemplateSection,
+} from "./content-template";
 
