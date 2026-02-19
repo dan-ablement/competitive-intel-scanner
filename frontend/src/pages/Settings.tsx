@@ -1,5 +1,5 @@
-import { useState } from "react";
-import { useSettings, useUpdateSettings } from "@/hooks/use-system";
+import { useState, useEffect } from "react";
+import { useSettings, useKVSetting, useSetKVSetting } from "@/hooks/use-system";
 import { useSuggestions, useApproveSuggestion, useRejectSuggestion } from "@/hooks/use-suggestions";
 import { useTriggerProfileReview } from "@/hooks/use-system";
 import {
@@ -319,16 +319,21 @@ function SuggestionsSection() {
 // Google Drive Folder ID Section
 // ---------------------------------------------------------------------------
 
-function GoogleDriveFolderSection({ settings }: { settings: Record<string, unknown> }) {
-  const updateSettings = useUpdateSettings();
-  const [folderId, setFolderId] = useState(
-    (settings.google_drive_folder_id as string) ?? ""
-  );
+function GoogleDriveFolderSection() {
+  const { data: kvSetting, isLoading } = useKVSetting("GOOGLE_DRIVE_FOLDER_ID");
+  const setKV = useSetKVSetting();
+  const [folderId, setFolderId] = useState("");
   const [saved, setSaved] = useState(false);
 
+  useEffect(() => {
+    if (kvSetting?.value) {
+      setFolderId(kvSetting.value);
+    }
+  }, [kvSetting]);
+
   const handleSave = () => {
-    updateSettings.mutate(
-      { ...settings, google_drive_folder_id: folderId },
+    setKV.mutate(
+      { key: "GOOGLE_DRIVE_FOLDER_ID", value: folderId || null },
       {
         onSuccess: () => {
           setSaved(true);
@@ -352,15 +357,16 @@ function GoogleDriveFolderSection({ settings }: { settings: Record<string, unkno
           type="text"
           value={folderId}
           onChange={(e) => setFolderId(e.target.value)}
-          placeholder="Enter Google Drive folder ID"
-          className="flex-1 rounded-md border border-input bg-background px-3 py-2 text-sm placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring"
+          placeholder={isLoading ? "Loading..." : "Enter Google Drive folder ID"}
+          disabled={isLoading}
+          className="flex-1 rounded-md border border-input bg-background px-3 py-2 text-sm placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring disabled:opacity-50"
         />
         <button
           onClick={handleSave}
-          disabled={updateSettings.isPending}
+          disabled={setKV.isPending || isLoading}
           className="inline-flex items-center gap-1.5 rounded-md bg-primary px-3 py-2 text-sm font-medium text-primary-foreground hover:bg-primary/90 disabled:opacity-50"
         >
-          {updateSettings.isPending ? (
+          {setKV.isPending ? (
             <Loader2 className="h-3.5 w-3.5 animate-spin" />
           ) : saved ? (
             <CheckCircle2 className="h-3.5 w-3.5" />
@@ -752,7 +758,7 @@ export default function Settings() {
           <ScheduleSection settings={settings as Record<string, unknown>} />
           <ContentTypesSection contentTypes={(settings as Record<string, unknown>).content_types as string[] ?? []} />
           <ContentTemplatesSection />
-          <GoogleDriveFolderSection settings={settings as Record<string, unknown>} />
+          <GoogleDriveFolderSection />
           <AdminsSection admins={(settings as Record<string, unknown>).admins as string[] ?? []} />
         </div>
       )}

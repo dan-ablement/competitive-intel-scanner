@@ -70,7 +70,15 @@ def upgrade() -> None:
     op.add_column("users", sa.Column("google_refresh_token", sa.String(), nullable=True))
     op.add_column("users", sa.Column("google_access_token", sa.String(), nullable=True))
 
-    # 5. Seed default "Competitive Battle Card" template
+    # 5. Create system_settings table
+    op.create_table(
+        "system_settings",
+        sa.Column("key", sa.String(), primary_key=True),
+        sa.Column("value", sa.Text(), nullable=True),
+        sa.Column("updated_at", sa.DateTime(), nullable=False, server_default=sa.func.now()),
+    )
+
+    # 6. Seed default "Competitive Battle Card" template
     op.execute("""
         INSERT INTO content_templates (id, content_type, name, description, sections, doc_name_pattern, is_active, created_at, updated_at)
         VALUES (
@@ -98,8 +106,11 @@ def upgrade() -> None:
 def downgrade() -> None:
     # Reverse order of upgrade operations
 
-    # 5. Delete seeded template (no-op if already deleted)
+    # 6. Delete seeded template (no-op if already deleted)
     op.execute("DELETE FROM content_templates WHERE content_type = 'battle_card'")
+
+    # 5. Drop system_settings table
+    op.drop_table("system_settings")
 
     # 4. Drop Google OAuth token columns from users
     op.drop_column("users", "google_access_token")

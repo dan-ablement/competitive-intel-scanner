@@ -11,12 +11,13 @@ export interface ContentOutputFilters {
 export interface StaleContentItem {
   competitor_id: string;
   competitor_name: string;
-  template_id: string;
-  template_name: string;
   content_type: string;
+  template_id: string | null;
+  template_name: string | null;
   last_output_id: string | null;
   last_output_at: string | null;
-  status: ContentOutputStatus | null;
+  status: string;
+  days_stale: number | null;
 }
 
 export async function listContentOutputs(filters?: ContentOutputFilters): Promise<ContentOutput[]> {

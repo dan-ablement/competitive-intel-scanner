@@ -416,6 +416,7 @@ function StaleContentCard({ item }: { item: StaleContentItem }) {
   const [generating, setGenerating] = useState(false);
 
   const handleGenerate = async () => {
+    if (!item.template_id) return;
     setGenerating(true);
     try {
       await generateDraft.mutateAsync({
@@ -499,7 +500,7 @@ function StaleContentSection() {
         <div className="mt-3 space-y-2">
           {staleItems.map((item) => (
             <StaleContentCard
-              key={`${item.competitor_id}-${item.template_id}`}
+              key={`${item.competitor_id}-${item.template_id ?? item.content_type}`}
               item={item}
             />
           ))}

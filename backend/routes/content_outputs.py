@@ -69,9 +69,12 @@ class StaleContentItem(BaseModel):
     competitor_id: str
     competitor_name: str
     content_type: str
+    template_id: Optional[str] = None
+    template_name: Optional[str] = None
+    last_output_id: Optional[str] = None
+    last_output_at: Optional[str] = None
     status: str  # 'stale' or 'missing'
     days_stale: Optional[int] = None
-    latest_content_id: Optional[str] = None
 
 
 class GenerateResponse(BaseModel):
@@ -245,6 +248,11 @@ def get_stale_content(
     Missing: a competitor has content_types configured but no content_output at all.
     """
     competitors = db.query(Competitor).filter(Competitor.is_active == True).all()
+
+    # Pre-load content templates keyed by content_type for lookups
+    templates = db.query(ContentTemplate).all()
+    template_by_type: dict[str, ContentTemplate] = {t.content_type: t for t in templates}
+
     results: list[dict] = []
 
     for comp in competitors:
@@ -253,6 +261,9 @@ def get_stale_content(
             continue
 
         for ct in configured_types:
+            # Look up template for this content_type
+            tmpl = template_by_type.get(ct)
+
             # Find latest content output for this competitor + content_type
             latest_co = (
                 db.query(ContentOutput)
@@ -271,9 +282,12 @@ def get_stale_content(
                     "competitor_id": str(comp.id),
                     "competitor_name": comp.name,
                     "content_type": ct,
+                    "template_id": str(tmpl.id) if tmpl else None,
+                    "template_name": tmpl.name if tmpl else None,
+                    "last_output_id": None,
+                    "last_output_at": None,
                     "status": "missing",
                     "days_stale": None,
-                    "latest_content_id": None,
                 })
                 continue
 
@@ -296,9 +310,12 @@ def get_stale_content(
                     "competitor_id": str(comp.id),
                     "competitor_name": comp.name,
                     "content_type": ct,
+                    "template_id": str(tmpl.id) if tmpl else None,
+                    "template_name": tmpl.name if tmpl else None,
+                    "last_output_id": str(latest_co.id),
+                    "last_output_at": utc_isoformat(latest_co.updated_at),
                     "status": "stale",
                     "days_stale": days_stale,
-                    "latest_content_id": str(latest_co.id),
                 })
 
     return results
@@ -354,7 +371,7 @@ def generate_content(
         title="",
         content="",
         version=1,
-        status="generating",
+        status="draft",
         template_id=uuid.UUID(body.template_id),
     )
     db.add(co)

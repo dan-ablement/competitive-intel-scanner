@@ -261,3 +261,43 @@ def update_settings(payload: dict):
     # Settings are read-only for now (managed via Cloud Scheduler / env vars).
     # In the future, this could persist to a settings table.
     return SCHEDULE_CONFIG
+
+
+# ---------------------------------------------------------------------------
+# Key-Value Settings (persisted to DB)
+# ---------------------------------------------------------------------------
+
+class KVSettingResponse(BaseModel):
+    key: str
+    value: str | None
+
+
+class KVSettingUpdate(BaseModel):
+    value: str | None
+
+
+@router.get("/settings/kv/{key}", response_model=KVSettingResponse)
+def get_kv_setting(key: str, db: Session = Depends(get_db)):
+    """Get a single key-value setting by key."""
+    from backend.models.system_setting import SystemSetting
+
+    setting = db.query(SystemSetting).filter(SystemSetting.key == key).first()
+    if not setting:
+        return {"key": key, "value": None}
+    return {"key": setting.key, "value": setting.value}
+
+
+@router.put("/settings/kv/{key}", response_model=KVSettingResponse)
+def upsert_kv_setting(key: str, body: KVSettingUpdate, db: Session = Depends(get_db)):
+    """Create or update a key-value setting."""
+    from backend.models.system_setting import SystemSetting
+
+    setting = db.query(SystemSetting).filter(SystemSetting.key == key).first()
+    if setting:
+        setting.value = body.value
+    else:
+        setting = SystemSetting(key=key, value=body.value)
+        db.add(setting)
+    db.commit()
+    db.refresh(setting)
+    return {"key": setting.key, "value": setting.value}

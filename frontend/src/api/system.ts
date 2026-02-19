@@ -31,3 +31,18 @@ export async function updateSettings(settings: SystemSettings): Promise<SystemSe
   return data;
 }
 
+export interface KVSetting {
+  key: string;
+  value: string | null;
+}
+
+export async function getKVSetting(key: string): Promise<KVSetting> {
+  const { data } = await apiClient.get<KVSetting>(`/settings/kv/${key}`);
+  return data;
+}
+
+export async function setKVSetting(key: string, value: string | null): Promise<KVSetting> {
+  const { data } = await apiClient.put<KVSetting>(`/settings/kv/${key}`, { value });
+  return data;
+}
+
