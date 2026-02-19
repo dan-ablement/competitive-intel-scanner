@@ -3,6 +3,7 @@ import {
   LayoutDashboard,
   CreditCard,
   FileText,
+  FileEdit,
   Users,
   Building2,
   Rss,
@@ -14,32 +15,39 @@ import { cn } from "@/lib/utils";
 import { useCards } from "@/hooks/use-cards";
 import { useSuggestions } from "@/hooks/use-suggestions";
 import { useCompetitors } from "@/hooks/use-competitors";
+import { useContentOutputs } from "@/hooks/use-content-outputs";
 
 const navItems = [
   { to: "/", label: "Dashboard", icon: LayoutDashboard, badgeKey: null },
   { to: "/cards", label: "Analysis Cards", icon: CreditCard, badgeKey: "cards" as const },
   { to: "/briefings", label: "Briefings", icon: FileText, badgeKey: null },
+  { to: "/content", label: "Content", icon: FileEdit, badgeKey: "content" as const },
   { to: "/competitors", label: "Competitors", icon: Users, badgeKey: "competitors" as const },
   { to: "/augment-profile", label: "Augment Profile", icon: Building2, badgeKey: null },
   { to: "/feeds", label: "Feeds", icon: Rss, badgeKey: null },
   { to: "/settings", label: "Settings", icon: Settings, badgeKey: "suggestions" as const },
 ];
 
-type BadgeKey = "cards" | "competitors" | "suggestions";
+type BadgeKey = "cards" | "content" | "competitors" | "suggestions";
 
 function useSidebarBadges(): Record<BadgeKey, number> {
   const { data: cards } = useCards();
   const { data: suggestions } = useSuggestions();
   const { data: suggestedCompetitors } = useCompetitors({ is_suggested: true });
+  const { data: contentOutputs } = useContentOutputs();
 
   const draftOrReview = (cards ?? []).filter(
     (c) => c.status === "draft" || c.status === "in_review"
   ).length;
   const pendingSuggestions = (suggestions ?? []).filter((s) => s.status === "pending").length;
   const suggestedCount = (suggestedCompetitors ?? []).length;
+  const contentDraftOrReview = (contentOutputs ?? []).filter(
+    (o) => o.status === "draft" || o.status === "in_review"
+  ).length;
 
   return {
     cards: draftOrReview,
+    content: contentDraftOrReview,
     competitors: suggestedCount,
     suggestions: pendingSuggestions,
   };

@@ -9,6 +9,8 @@ import Cards from "@/pages/Cards";
 import CardDetail from "@/pages/CardDetail";
 import Briefings from "@/pages/Briefings";
 import BriefingDetail from "@/pages/BriefingDetail";
+import ContentOutputs from "@/pages/ContentOutputs";
+import ContentOutputDetail from "@/pages/ContentOutputDetail";
 import Competitors from "@/pages/Competitors";
 import CompetitorDetail from "@/pages/CompetitorDetail";
 import AugmentProfile from "@/pages/AugmentProfile";
@@ -40,6 +42,8 @@ function App() {
                 <Route path="cards/:id" element={<CardDetail />} />
                 <Route path="briefings" element={<Briefings />} />
                 <Route path="briefings/:id" element={<BriefingDetail />} />
+                <Route path="content" element={<ContentOutputs />} />
+                <Route path="content/:id" element={<ContentOutputDetail />} />
                 <Route path="competitors" element={<Competitors />} />
                 <Route path="competitors/:id" element={<CompetitorDetail />} />
                 <Route path="augment-profile" element={<AugmentProfile />} />
