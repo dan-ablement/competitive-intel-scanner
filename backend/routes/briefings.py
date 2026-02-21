@@ -4,12 +4,15 @@ import uuid
 from datetime import datetime, timezone
 from typing import Optional
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Request
 from pydantic import BaseModel
 from sqlalchemy.orm import Session, joinedload
 
 from backend.database import get_db
+from backend.models.analysis_card import AnalysisCard
 from backend.models.briefing import Briefing
+from backend.models.user import User
+from backend.routes.auth import get_current_user
 from backend.utils import utc_isoformat
 
 router = APIRouter()
@@ -55,6 +58,17 @@ class BriefingUpdate(BaseModel):
 
 class StatusUpdate(BaseModel):
     status: str
+
+
+class BulkApproveResponse(BaseModel):
+    id: str
+    date: str
+    content: str
+    status: str
+    approved_at: Optional[str] = None
+    cards_approved: int
+    created_at: str
+    updated_at: str
 
 
 # ---------------------------------------------------------------------------
@@ -207,3 +221,56 @@ def update_briefing_status(
         .first()
     )
     return _briefing_to_response(briefing)
+
+
+
+@router.post("/{briefing_id}/approve-all", response_model=BulkApproveResponse)
+def approve_all_briefing_cards(
+    briefing_id: str,
+    request: Request,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """Approve all linked cards and the briefing itself in one request. Admin-only."""
+    if current_user.role != "admin":
+        raise HTTPException(status_code=403, detail="Only admin users can approve briefings")
+
+    briefing = _get_briefing_or_404(briefing_id, db)
+
+    now = datetime.now(timezone.utc)
+
+    # Approve all linked cards
+    cards_approved = 0
+    if briefing.cards:
+        card_ids = [c.id for c in briefing.cards]
+        cards_approved = (
+            db.query(AnalysisCard)
+            .filter(AnalysisCard.id.in_(card_ids))
+            .update(
+                {
+                    AnalysisCard.status: "approved",
+                    AnalysisCard.approved_by: current_user.id,
+                    AnalysisCard.approved_at: now,
+                },
+                synchronize_session="fetch",
+            )
+        )
+
+    # Approve the briefing itself
+    briefing.status = "approved"
+    briefing.approved_by = current_user.id
+    briefing.approved_at = now
+
+    db.commit()
+    db.refresh(briefing)
+
+    return {
+        "id": str(briefing.id),
+        "date": briefing.date.isoformat() if briefing.date else None,
+        "content": briefing.content,
+        "status": briefing.status,
+        "approved_at": utc_isoformat(briefing.approved_at),
+        "cards_approved": cards_approved,
+        "created_at": utc_isoformat(briefing.created_at),
+        "updated_at": utc_isoformat(briefing.updated_at),
+    }
