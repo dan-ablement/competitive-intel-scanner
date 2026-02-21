@@ -215,7 +215,7 @@ class TestGetContentOutput:
 
 
 class TestGenerateContent:
-    """Tests for generate_content route handler."""
+    """Tests for generate_content route handler (synchronous)."""
 
     def test_competitor_not_found_raises_404(self, mock_db, make_user):
         """Returns 404 when competitor doesn't exist."""
@@ -224,10 +224,9 @@ class TestGenerateContent:
         mock_db.first.return_value = None
         user = make_user()
         body = ContentOutputCreate(competitor_id=str(uuid.uuid4()), template_id=str(uuid.uuid4()))
-        bg = MagicMock()
 
         with pytest.raises(Exception) as exc_info:
-            generate_content(body=body, background_tasks=bg, db=mock_db, current_user=user)
+            generate_content(body=body, db=mock_db, current_user=user)
         assert exc_info.value.status_code == 404
         assert "Competitor" in exc_info.value.detail
 
@@ -240,12 +239,92 @@ class TestGenerateContent:
         mock_db.first.side_effect = [comp, None]
         user = make_user()
         body = ContentOutputCreate(competitor_id=str(comp.id), template_id=str(uuid.uuid4()))
-        bg = MagicMock()
 
         with pytest.raises(Exception) as exc_info:
-            generate_content(body=body, background_tasks=bg, db=mock_db, current_user=user)
+            generate_content(body=body, db=mock_db, current_user=user)
         assert exc_info.value.status_code == 404
         assert "Template" in exc_info.value.detail
+
+    @patch("backend.routes.content_outputs.ContentGenerator")
+    def test_successful_generation_returns_content(self, MockGenerator, mock_db, make_user, make_competitor, make_content_template):
+        """Synchronous generation returns ContentOutputResponse with content."""
+        from backend.routes.content_outputs import generate_content, ContentOutputCreate
+
+        comp = make_competitor(name="Acme")
+        tmpl = make_content_template(doc_name_pattern="Battle Card - {competitor}")
+        user = make_user()
+        body = ContentOutputCreate(competitor_id=str(comp.id), template_id=str(tmpl.id))
+
+        mock_gen_instance = MagicMock()
+        mock_gen_instance.generate_content.return_value = {
+            "content": '{"Overview": "Test"}',
+            "raw_llm_output": {"model": "test"},
+            "source_card_ids": ["card-1"],
+            "content_type": "Competitive Battle Card",
+        }
+        MockGenerator.return_value = mock_gen_instance
+
+        # Capture the ContentOutput object added to the session
+        captured = {}
+        def track_add(obj):
+            captured["co"] = obj
+            obj.competitor = comp  # attach for serialization
+        mock_db.add.side_effect = track_add
+
+        # first() calls: 1=competitor, 2=template, 3=reload with joinedload
+        call_count = [0]
+        def smart_first():
+            call_count[0] += 1
+            if call_count[0] == 1:
+                return comp
+            elif call_count[0] == 2:
+                return tmpl
+            else:
+                return captured.get("co")
+        mock_db.first.side_effect = smart_first
+
+        result = generate_content(body=body, db=mock_db, current_user=user)
+
+        assert result["status"] == "draft"
+        assert result["content"] == '{"Overview": "Test"}'
+        assert result["title"] == "Battle Card - Acme"
+
+    @patch("backend.routes.content_outputs.ContentGenerator")
+    def test_generation_failure_sets_failed_status(self, MockGenerator, mock_db, make_user, make_competitor, make_content_template):
+        """When ContentGenerator raises, status is set to 'failed' with error_message."""
+        from backend.routes.content_outputs import generate_content, ContentOutputCreate
+
+        comp = make_competitor(name="Acme")
+        tmpl = make_content_template()
+        user = make_user()
+        body = ContentOutputCreate(competitor_id=str(comp.id), template_id=str(tmpl.id))
+
+        mock_gen_instance = MagicMock()
+        mock_gen_instance.generate_content.side_effect = RuntimeError("LLM failed")
+        MockGenerator.return_value = mock_gen_instance
+
+        # Capture the ContentOutput object added to the session
+        captured = {}
+        def track_add(obj):
+            captured["co"] = obj
+            obj.competitor = comp
+        mock_db.add.side_effect = track_add
+
+        call_count = [0]
+        def smart_first():
+            call_count[0] += 1
+            if call_count[0] == 1:
+                return comp
+            elif call_count[0] == 2:
+                return tmpl
+            else:
+                return captured.get("co")
+        mock_db.first.side_effect = smart_first
+
+        result = generate_content(body=body, db=mock_db, current_user=user)
+
+        assert result["status"] == "failed"
+        assert "LLM failed" in result["error_message"]
 
 
 class TestUpdateContentOutput:

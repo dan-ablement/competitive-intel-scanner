@@ -9,6 +9,7 @@ from datetime import datetime, timezone
 from typing import Any, Optional
 
 from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Query
+from backend.services.content_generator import ContentGenerator
 from pydantic import BaseModel
 from sqlalchemy.orm import Session, joinedload
 
@@ -77,12 +78,6 @@ class StaleContentItem(BaseModel):
     days_stale: Optional[int] = None
 
 
-class GenerateResponse(BaseModel):
-    id: str
-    status: str
-    message: str
-
-
 # ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------
@@ -125,54 +120,12 @@ def _output_to_response(co: ContentOutput) -> dict:
     }
 
 
-VALID_STATUSES = {"draft", "in_review", "approved", "published", "failed"}
+VALID_STATUSES = {"draft", "generating", "in_review", "approved", "published", "failed"}
 
 
 # ---------------------------------------------------------------------------
 # Background task helpers
 # ---------------------------------------------------------------------------
-
-def _run_content_generation(content_output_id: str, competitor_id: str, template_id: str) -> None:
-    """Background task: generate content via LLM and update the content_output record."""
-    db = SessionLocal()
-    try:
-        from backend.services.content_generator import ContentGenerator
-
-        generator = ContentGenerator()
-        result = generator.generate_content(
-            db,
-            competitor_id=uuid.UUID(competitor_id),
-            template_id=uuid.UUID(template_id),
-        )
-
-        co = db.query(ContentOutput).filter(ContentOutput.id == uuid.UUID(content_output_id)).first()
-        if co:
-            co.content = result.get("content", "")
-            co.raw_llm_output = result.get("raw_llm_output")
-            co.source_card_ids = result.get("source_card_ids", [])
-            co.content_type = result.get("content_type", co.content_type)
-
-            # Generate title from template + competitor
-            competitor = db.query(Competitor).filter(Competitor.id == uuid.UUID(competitor_id)).first()
-            template = db.query(ContentTemplate).filter(ContentTemplate.id == uuid.UUID(template_id)).first()
-            if template and competitor and template.doc_name_pattern:
-                co.title = template.doc_name_pattern.replace("{competitor}", competitor.name)
-            elif competitor:
-                co.title = f"Battle Card - {competitor.name}"
-
-            co.status = "draft"
-            db.commit()
-            logger.info("Content generation complete for output %s", content_output_id)
-    except Exception as e:
-        logger.exception("Content generation failed for output %s", content_output_id)
-        co = db.query(ContentOutput).filter(ContentOutput.id == uuid.UUID(content_output_id)).first()
-        if co:
-            co.status = "failed"
-            co.error_message = f"Content generation failed: {str(e)}"
-            db.commit()
-    finally:
-        db.close()
-
 
 def _run_google_docs_publish(content_output_id: str, user_id: str) -> None:
     """Background task: publish content to Google Docs."""
@@ -339,17 +292,16 @@ def get_content_output(
     return _output_to_response(co)
 
 
-@router.post("/generate", response_model=GenerateResponse, status_code=202)
+@router.post("/generate", response_model=ContentOutputResponse, status_code=200)
 def generate_content(
     body: ContentOutputCreate,
-    background_tasks: BackgroundTasks,
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    """Kick off content generation for a competitor + template.
+    """Generate content for a competitor + template synchronously.
 
-    Creates a ContentOutput in 'generating' status and runs LLM generation
-    as a background task. Returns 202 immediately.
+    Creates a ContentOutput, calls the LLM inline, and returns the
+    completed (or failed) content output.
     """
     # Validate competitor exists
     competitor = db.query(Competitor).filter(Competitor.id == uuid.UUID(body.competitor_id)).first()
@@ -364,33 +316,59 @@ def generate_content(
     if not template:
         raise HTTPException(status_code=404, detail="Template not found or inactive")
 
-    # Create content output record
+    # Create content output record with "generating" status
     co = ContentOutput(
         competitor_id=uuid.UUID(body.competitor_id),
         content_type=template.content_type,
         title="",
         content="",
         version=1,
-        status="draft",
+        status="generating",
         template_id=uuid.UUID(body.template_id),
     )
     db.add(co)
     db.commit()
     db.refresh(co)
 
-    # Run generation in background
-    background_tasks.add_task(
-        _run_content_generation,
-        str(co.id),
-        body.competitor_id,
-        body.template_id,
-    )
+    # Generate content SYNCHRONOUSLY
+    try:
+        generator = ContentGenerator()
+        result = generator.generate_content(
+            db,
+            competitor_id=uuid.UUID(body.competitor_id),
+            template_id=uuid.UUID(body.template_id),
+        )
 
-    return {
-        "id": str(co.id),
-        "status": "generating",
-        "message": "Content generation started. Poll GET /{id} for status.",
-    }
+        co.content = result.get("content", "")
+        co.raw_llm_output = result.get("raw_llm_output")
+        co.source_card_ids = result.get("source_card_ids", [])
+        co.content_type = result.get("content_type", co.content_type)
+
+        # Generate title from template + competitor
+        if template and competitor and template.doc_name_pattern:
+            co.title = template.doc_name_pattern.replace("{competitor}", competitor.name)
+        elif competitor:
+            co.title = f"Battle Card - {competitor.name}"
+
+        co.status = "draft"
+        db.commit()
+        db.refresh(co)
+        logger.info("Content generation complete for output %s", co.id)
+    except Exception as e:
+        logger.exception("Content generation failed for output %s", co.id)
+        co.status = "failed"
+        co.error_message = str(e)
+        db.commit()
+        db.refresh(co)
+
+    # Reload with competitor relationship for serialization
+    co = (
+        db.query(ContentOutput)
+        .options(joinedload(ContentOutput.competitor))
+        .filter(ContentOutput.id == co.id)
+        .first()
+    )
+    return _output_to_response(co)
 
 
 @router.put("/{output_id}", response_model=ContentOutputResponse)

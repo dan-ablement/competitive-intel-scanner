@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Link } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 import { useContentOutputs, useGenerateDraft } from "@/hooks/use-content-outputs";
 import { useContentTemplates } from "@/hooks/use-content-templates";
 import { useCompetitors } from "@/hooks/use-competitors";
@@ -23,6 +23,7 @@ import {
 
 const STATUS_OPTIONS: { value: ContentOutputStatus; label: string }[] = [
   { value: "draft", label: "Draft" },
+  { value: "generating", label: "Generating" },
   { value: "in_review", label: "In Review" },
   { value: "approved", label: "Approved" },
   { value: "published", label: "Published" },
@@ -31,6 +32,7 @@ const STATUS_OPTIONS: { value: ContentOutputStatus; label: string }[] = [
 
 const STATUS_BADGE_CONFIG: Record<ContentOutputStatus, string> = {
   draft: "bg-gray-100 text-gray-700 border-gray-200",
+  generating: "bg-yellow-100 text-yellow-700 border-yellow-200",
   in_review: "bg-blue-100 text-blue-700 border-blue-200",
   approved: "bg-green-100 text-green-700 border-green-200",
   published: "bg-purple-100 text-purple-700 border-purple-200",
@@ -39,6 +41,7 @@ const STATUS_BADGE_CONFIG: Record<ContentOutputStatus, string> = {
 
 const STATUS_LABELS: Record<ContentOutputStatus, string> = {
   draft: "Draft",
+  generating: "Generating…",
   in_review: "In Review",
   approved: "Approved",
   published: "Published",
@@ -208,6 +211,7 @@ export default function ContentOutputs() {
   const [search, setSearch] = useState("");
   const [showFilters, setShowFilters] = useState(false);
   const [showGenerateModal, setShowGenerateModal] = useState(false);
+  const navigate = useNavigate();
 
   const { data: outputs, isLoading, error, refetch } = useContentOutputs(filters);
   const { data: competitors } = useCompetitors();
@@ -224,8 +228,11 @@ export default function ContentOutputs() {
   }
 
   async function handleGenerate(competitorId: string, templateId: string) {
-    await generateMutation.mutateAsync({ competitorId, templateId });
+    const result = await generateMutation.mutateAsync({ competitorId, templateId });
     setShowGenerateModal(false);
+    if (result?.id) {
+      navigate(`/content/${result.id}`);
+    }
   }
 
   // Get unique content types from the data for the filter dropdown

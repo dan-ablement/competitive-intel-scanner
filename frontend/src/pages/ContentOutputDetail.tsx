@@ -33,6 +33,7 @@ const STATUS_ORDER: ContentOutputStatus[] = ["draft", "in_review", "approved", "
 
 const STATUS_CONFIG: Record<ContentOutputStatus, { label: string; color: string; bgColor: string }> = {
   draft: { label: "Draft", color: "text-gray-700", bgColor: "bg-gray-100" },
+  generating: { label: "Generating…", color: "text-yellow-700", bgColor: "bg-yellow-100" },
   in_review: { label: "In Review", color: "text-blue-700", bgColor: "bg-blue-100" },
   approved: { label: "Approved", color: "text-green-700", bgColor: "bg-green-100" },
   published: { label: "Published", color: "text-purple-700", bgColor: "bg-purple-100" },

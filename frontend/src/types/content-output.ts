@@ -1,5 +1,6 @@
 export type ContentOutputStatus =
   | "draft"
+  | "generating"
   | "in_review"
   | "approved"
   | "published"
