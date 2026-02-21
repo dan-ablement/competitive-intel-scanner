@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
-import { useContentOutputs, useGenerateDraft } from "@/hooks/use-content-outputs";
+import { useContentOutputs, useGenerateDraft, useDeleteContentOutput } from "@/hooks/use-content-outputs";
 import { useContentTemplates } from "@/hooks/use-content-templates";
 import { useCompetitors } from "@/hooks/use-competitors";
 import type { ContentOutputFilters } from "@/api/content-outputs";
@@ -15,6 +15,7 @@ import {
   RefreshCw,
   Plus,
   ExternalLink,
+  Trash2,
 } from "lucide-react";
 
 // ---------------------------------------------------------------------------
@@ -75,7 +76,7 @@ function formatDate(iso: string | null): string {
 // Content Output Row
 // ---------------------------------------------------------------------------
 
-function ContentOutputRow({ output }: { output: ContentOutput }) {
+function ContentOutputRow({ output, onDelete }: { output: ContentOutput; onDelete: (id: string) => void }) {
   return (
     <Link
       to={`/content/${output.id}`}
@@ -117,6 +118,19 @@ function ContentOutputRow({ output }: { output: ContentOutput }) {
       <span className="hidden shrink-0 text-xs text-muted-foreground sm:block">
         {formatDate(output.updated_at)}
       </span>
+
+      {/* Delete button */}
+      <button
+        onClick={(e) => {
+          e.preventDefault();
+          e.stopPropagation();
+          onDelete(output.id);
+        }}
+        className="shrink-0 rounded-md p-1.5 text-muted-foreground transition-colors hover:bg-red-50 hover:text-red-600"
+        title="Delete"
+      >
+        <Trash2 className="h-4 w-4" />
+      </button>
     </Link>
   );
 }
@@ -211,11 +225,13 @@ export default function ContentOutputs() {
   const [search, setSearch] = useState("");
   const [showFilters, setShowFilters] = useState(false);
   const [showGenerateModal, setShowGenerateModal] = useState(false);
+  const [deleteConfirmId, setDeleteConfirmId] = useState<string | null>(null);
   const navigate = useNavigate();
 
   const { data: outputs, isLoading, error, refetch } = useContentOutputs(filters);
   const { data: competitors } = useCompetitors();
   const generateMutation = useGenerateDraft();
+  const deleteMutation = useDeleteContentOutput();
 
   const hasActiveFilters = !!(filters.status || filters.competitor_id || filters.content_type);
 
@@ -233,6 +249,12 @@ export default function ContentOutputs() {
     if (result?.id) {
       navigate(`/content/${result.id}`);
     }
+  }
+
+  async function handleDelete() {
+    if (!deleteConfirmId) return;
+    await deleteMutation.mutateAsync(deleteConfirmId);
+    setDeleteConfirmId(null);
   }
 
   // Get unique content types from the data for the filter dropdown
@@ -392,7 +414,7 @@ export default function ContentOutputs() {
       ) : (
         <div className="overflow-hidden rounded-lg border border-border">
           {filtered.map((output) => (
-            <ContentOutputRow key={output.id} output={output} />
+            <ContentOutputRow key={output.id} output={output} onDelete={(id) => setDeleteConfirmId(id)} />
           ))}
         </div>
       )}
@@ -404,6 +426,34 @@ export default function ContentOutputs() {
           onGenerate={handleGenerate}
           isGenerating={generateMutation.isPending}
         />
+      )}
+
+      {/* Delete confirmation dialog */}
+      {deleteConfirmId && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
+          <div className="w-full max-w-sm rounded-lg border border-border bg-background p-6 shadow-lg">
+            <h2 className="text-lg font-semibold">Delete Content Output</h2>
+            <p className="mt-2 text-sm text-muted-foreground">
+              Are you sure you want to delete this content output? This action cannot be undone.
+            </p>
+            <div className="mt-4 flex justify-end gap-2">
+              <button
+                onClick={() => setDeleteConfirmId(null)}
+                className="rounded-md border border-input px-4 py-2 text-sm font-medium hover:bg-muted"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleDelete}
+                disabled={deleteMutation.isPending}
+                className="inline-flex items-center gap-2 rounded-md bg-red-600 px-4 py-2 text-sm font-medium text-white hover:bg-red-700 disabled:opacity-50"
+              >
+                {deleteMutation.isPending && <Loader2 className="h-4 w-4 animate-spin" />}
+                Delete
+              </button>
+            </div>
+          </div>
+        </div>
       )}
 
       {/* Generate error */}

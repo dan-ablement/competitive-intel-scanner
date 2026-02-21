@@ -327,6 +327,47 @@ class TestGenerateContent:
         assert "LLM failed" in result["error_message"]
 
 
+class TestDeleteContentOutput:
+    """Tests for delete_content_output route handler."""
+
+    def test_successful_delete_returns_none(self, mock_db, make_user, make_content_output):
+        """Successful delete returns None (204 status handled by FastAPI)."""
+        from backend.routes.content_outputs import delete_content_output
+
+        co = make_content_output()
+        mock_db.first.return_value = co
+        user = make_user()
+
+        result = delete_content_output(output_id=str(co.id), db=mock_db, current_user=user)
+
+        assert result is None
+        mock_db.delete.assert_called_once_with(co)
+        mock_db.commit.assert_called()
+
+    def test_delete_not_found_raises_404(self, mock_db, make_user):
+        """Returns 404 when content output not found."""
+        from backend.routes.content_outputs import delete_content_output
+
+        mock_db.first.return_value = None
+        user = make_user()
+
+        with pytest.raises(Exception) as exc_info:
+            delete_content_output(output_id=str(uuid.uuid4()), db=mock_db, current_user=user)
+        assert exc_info.value.status_code == 404
+
+    def test_delete_requires_auth(self):
+        """Delete endpoint requires authentication (get_current_user dependency).
+
+        This is verified by the function signature having current_user: User = Depends(get_current_user).
+        Without a valid user, FastAPI will return 401 before the handler runs.
+        """
+        from backend.routes.content_outputs import delete_content_output
+        import inspect
+        sig = inspect.signature(delete_content_output)
+        param_names = list(sig.parameters.keys())
+        assert "current_user" in param_names
+
+
 class TestUpdateContentOutput:
     """Tests for update_content_output route handler."""
 

@@ -397,6 +397,21 @@ def update_content_output(
     return _output_to_response(co)
 
 
+@router.delete("/{output_id}", status_code=204)
+def delete_content_output(
+    output_id: str,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """Hard-delete a content output. Content outputs are regenerable."""
+    co = db.query(ContentOutput).filter(ContentOutput.id == uuid.UUID(output_id)).first()
+    if not co:
+        raise HTTPException(status_code=404, detail="Content output not found")
+    db.delete(co)
+    db.commit()
+    return None
+
+
 @router.patch("/{output_id}/status", response_model=ContentOutputResponse)
 def update_content_output_status(
     output_id: str,

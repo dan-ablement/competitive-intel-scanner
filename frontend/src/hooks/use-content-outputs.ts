@@ -5,6 +5,7 @@ import {
   generateDraft,
   updateContentOutput,
   changeContentOutputStatus,
+  deleteContentOutput,
   getStaleContent,
   type ContentOutputFilters,
 } from "@/api/content-outputs";
@@ -57,6 +58,16 @@ export function useChangeContentOutputStatus() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["content-outputs"] });
       queryClient.invalidateQueries({ queryKey: ["content-templates"] });
+    },
+  });
+}
+
+export function useDeleteContentOutput() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (id: string) => deleteContentOutput(id),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["content-outputs"] });
     },
   });
 }

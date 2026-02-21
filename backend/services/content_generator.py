@@ -75,6 +75,7 @@ class ContentGenerator:
         competitor_text = self._format_competitor(competitor)
         sections = template.sections or []
         prompt = self._build_prompt(
+            competitor_name=competitor.name,
             competitor_text=competitor_text,
             augment_profile_text=augment_profile_text,
             cards_text=cards_text,
@@ -162,6 +163,7 @@ class ContentGenerator:
 
     def _build_prompt(
         self,
+        competitor_name: str,
         competitor_text: str,
         augment_profile_text: str,
         cards_text: str,
@@ -180,9 +182,9 @@ class ContentGenerator:
                 sections_instruction += f"\n   Guidance: {prompt_hint}"
             sections_instruction += "\n"
 
-        return f"""You are a competitive intelligence analyst creating battle card content for a sales team.
+        return f"""You are a competitive intelligence analyst creating a battle card for **{competitor_name}** specifically. This battle card is exclusively about {competitor_name} vs Augment Code. Do not mention, reference, or compare any other competitors.
 
-Your goal is to produce actionable, sales-team-friendly content that helps reps understand and compete against this competitor.
+Your goal is to produce actionable, sales-team-friendly content that helps reps understand and compete against {competitor_name}.
 
 ## Our Company (Augment)
 {augment_profile_text}
@@ -198,10 +200,12 @@ Generate content for each of the following sections. Return your response as a J
 {sections_instruction}
 
 ## Instructions
+- This battle card is exclusively about {competitor_name} vs Augment Code. Do not mention, reference, or compare any other competitors.
+- When analysis cards reference other competitors, ignore those references entirely. Extract only information directly relevant to {competitor_name} vs Augment Code.
 - Write in clear, actionable language suitable for sales representatives
 - Include specific talking points and objection handlers where relevant
 - Reference recent intelligence from the analysis cards when applicable
-- Focus on how Augment differentiates from this competitor
+- Focus on how Augment differentiates from {competitor_name}
 - Be factual and avoid speculation — base claims on the provided intelligence
 - Each section should be 2-5 paragraphs of substantive content
 

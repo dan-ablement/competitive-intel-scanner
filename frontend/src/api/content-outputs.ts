@@ -48,6 +48,10 @@ export async function changeContentOutputStatus(id: string, status: ContentOutpu
   return data;
 }
 
+export async function deleteContentOutput(id: string): Promise<void> {
+  await apiClient.delete(`/content-outputs/${id}`);
+}
+
 export async function getStaleContent(): Promise<StaleContentItem[]> {
   const { data } = await apiClient.get<StaleContentItem[]>("/content-outputs/stale");
   return data;
