@@ -6,6 +6,7 @@ import {
   useChangeContentOutputStatus,
   useGenerateDraft,
   useDeleteContentOutput,
+  usePublishContentOutput,
 } from "@/hooks/use-content-outputs";
 import { useAuth } from "@/contexts/AuthContext";
 import type { ContentOutput, ContentOutputStatus } from "@/types";
@@ -50,10 +51,16 @@ function ContentApprovalWorkflow({
   output,
   onStatusChange,
   isUpdating,
+  onPublish,
+  isPublishing,
+  publishError,
 }: {
   output: ContentOutput;
   onStatusChange: (status: ContentOutputStatus) => void;
   isUpdating: boolean;
+  onPublish: () => void;
+  isPublishing: boolean;
+  publishError: string | null;
 }) {
   const { user } = useAuth();
   const isAdmin = user?.role === "admin";
@@ -174,13 +181,26 @@ function ContentApprovalWorkflow({
 
         {currentStatus === "approved" && isAdmin && (
           <button
-            onClick={() => onStatusChange("published")}
-            disabled={isUpdating}
+            onClick={onPublish}
+            disabled={isPublishing}
             className="inline-flex items-center gap-2 rounded-md bg-purple-600 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-purple-700 disabled:opacity-50"
           >
-            <BookOpen className="h-4 w-4" />
-            Publish
+            {isPublishing ? (
+              <Loader2 className="h-4 w-4 animate-spin" />
+            ) : (
+              <BookOpen className="h-4 w-4" />
+            )}
+            {isPublishing ? "Publishing…" : "Publish to Google Docs"}
           </button>
+        )}
+
+        {publishError && (
+          <div className="rounded-md border border-red-200 bg-red-50 p-3">
+            <div className="flex items-center gap-2 text-sm text-red-800">
+              <AlertTriangle className="h-4 w-4" />
+              <span>{publishError}</span>
+            </div>
+          </div>
         )}
       </div>
     </div>
@@ -250,10 +270,12 @@ export default function ContentOutputDetail() {
   const statusMutation = useChangeContentOutputStatus();
   const retryMutation = useGenerateDraft();
   const deleteMutation = useDeleteContentOutput();
+  const publishMutation = usePublishContentOutput();
 
   const [saved, setSaved] = useState(false);
   const [editedContent, setEditedContent] = useState<string | null>(null);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+  const [publishError, setPublishError] = useState<string | null>(null);
 
   const isEditable = output?.status === "draft" || output?.status === "in_review";
   const currentContent = editedContent ?? output?.content ?? "";
@@ -285,6 +307,20 @@ export default function ContentOutputDetail() {
     if (!id) return;
     await deleteMutation.mutateAsync(id);
     navigate("/content");
+  };
+
+  const handlePublish = async () => {
+    if (!id) return;
+    setPublishError(null);
+    try {
+      await publishMutation.mutateAsync(id);
+    } catch (err: unknown) {
+      const message =
+        err && typeof err === "object" && "response" in err
+          ? ((err as { response?: { data?: { detail?: string } } }).response?.data?.detail ?? "Publish failed")
+          : "Publish failed";
+      setPublishError(message);
+    }
   };
 
   // Parse content into sections (try JSON first, fallback to plain text)
@@ -507,6 +543,9 @@ export default function ContentOutputDetail() {
               output={output}
               onStatusChange={handleStatusChange}
               isUpdating={statusMutation.isPending}
+              onPublish={handlePublish}
+              isPublishing={publishMutation.isPending}
+              publishError={publishError}
             />
           </div>
 

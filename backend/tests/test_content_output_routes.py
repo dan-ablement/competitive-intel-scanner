@@ -393,11 +393,10 @@ class TestUpdateContentOutputStatus:
 
         user = make_user()
         body = StatusUpdate(status="invalid_status")
-        bg = MagicMock()
 
         with pytest.raises(Exception) as exc_info:
             update_content_output_status(
-                output_id=str(uuid.uuid4()), body=body, background_tasks=bg,
+                output_id=str(uuid.uuid4()), body=body,
                 db=mock_db, current_user=user,
             )
         assert exc_info.value.status_code == 400
@@ -409,11 +408,10 @@ class TestUpdateContentOutputStatus:
         mock_db.first.return_value = None
         user = make_user()
         body = StatusUpdate(status="in_review")
-        bg = MagicMock()
 
         with pytest.raises(Exception) as exc_info:
             update_content_output_status(
-                output_id=str(uuid.uuid4()), body=body, background_tasks=bg,
+                output_id=str(uuid.uuid4()), body=body,
                 db=mock_db, current_user=user,
             )
         assert exc_info.value.status_code == 404
@@ -426,35 +424,31 @@ class TestUpdateContentOutputStatus:
         mock_db.first.return_value = co
         user = make_user(role="viewer")
         body = StatusUpdate(status="approved")
-        bg = MagicMock()
 
         with pytest.raises(Exception) as exc_info:
             update_content_output_status(
-                output_id=str(co.id), body=body, background_tasks=bg,
+                output_id=str(co.id), body=body,
                 db=mock_db, current_user=user,
             )
         assert exc_info.value.status_code == 403
 
-    def test_admin_approval_sets_fields(self, mock_db, make_user, make_content_output):
-        """Admin approval sets approved_by and approved_at."""
+    def test_admin_approval_sets_fields_no_auto_publish(self, mock_db, make_user, make_content_output):
+        """Admin approval sets approved_by and approved_at but does NOT trigger auto-publish."""
         from backend.routes.content_outputs import update_content_output_status, StatusUpdate
 
         co = make_content_output(status="in_review")
         mock_db.first.return_value = co
         admin = make_user(role="admin")
         body = StatusUpdate(status="approved")
-        bg = MagicMock()
 
         result = update_content_output_status(
-            output_id=str(co.id), body=body, background_tasks=bg,
+            output_id=str(co.id), body=body,
             db=mock_db, current_user=admin,
         )
 
         assert co.approved_by == admin.id
         assert co.approved_at is not None
         assert co.status == "approved"
-        # Background task should be scheduled for Google Docs publish
-        bg.add_task.assert_called_once()
 
     def test_non_approval_status_change(self, mock_db, make_user, make_content_output):
         """Non-approval status change works without admin."""
@@ -464,13 +458,100 @@ class TestUpdateContentOutputStatus:
         mock_db.first.return_value = co
         user = make_user(role="viewer")
         body = StatusUpdate(status="in_review")
-        bg = MagicMock()
 
         result = update_content_output_status(
-            output_id=str(co.id), body=body, background_tasks=bg,
+            output_id=str(co.id), body=body,
             db=mock_db, current_user=user,
         )
 
         assert co.status == "in_review"
-        bg.add_task.assert_not_called()
+
+
+class TestPublishContentOutput:
+    """Tests for publish_content_output route handler."""
+
+    def test_publish_requires_admin(self, mock_db, make_user):
+        """Non-admin user gets 403 when trying to publish."""
+        from backend.routes.content_outputs import publish_content_output
+
+        user = make_user(role="viewer")
+
+        with pytest.raises(Exception) as exc_info:
+            publish_content_output(output_id=str(uuid.uuid4()), db=mock_db, current_user=user)
+        assert exc_info.value.status_code == 403
+
+    def test_publish_not_found_raises_404(self, mock_db, make_user):
+        """Returns 404 when content output not found."""
+        from backend.routes.content_outputs import publish_content_output
+
+        mock_db.first.return_value = None
+        admin = make_user(role="admin")
+        admin.google_refresh_token = "token"
+
+        with pytest.raises(Exception) as exc_info:
+            publish_content_output(output_id=str(uuid.uuid4()), db=mock_db, current_user=admin)
+        assert exc_info.value.status_code == 404
+
+    def test_publish_requires_approved_status(self, mock_db, make_user, make_content_output):
+        """Returns 400 when content output is not approved."""
+        from backend.routes.content_outputs import publish_content_output
+
+        co = make_content_output(status="draft")
+        mock_db.first.return_value = co
+        admin = make_user(role="admin")
+        admin.google_refresh_token = "token"
+
+        with pytest.raises(Exception) as exc_info:
+            publish_content_output(output_id=str(co.id), db=mock_db, current_user=admin)
+        assert exc_info.value.status_code == 400
+        assert "approved" in exc_info.value.detail.lower()
+
+    def test_publish_requires_google_credentials(self, mock_db, make_user, make_content_output):
+        """Returns 400 when user has no Google credentials."""
+        from backend.routes.content_outputs import publish_content_output
+
+        co = make_content_output(status="approved")
+        mock_db.first.return_value = co
+        admin = make_user(role="admin")
+        admin.google_refresh_token = None
+
+        with pytest.raises(Exception) as exc_info:
+            publish_content_output(output_id=str(co.id), db=mock_db, current_user=admin)
+        assert exc_info.value.status_code == 400
+        assert "Google credentials" in exc_info.value.detail
+
+    @patch("backend.services.google_docs_service.GoogleDocsService")
+    def test_publish_success(self, MockService, mock_db, make_user, make_content_output):
+        """Successful publish calls GoogleDocsService.publish_doc."""
+        from backend.routes.content_outputs import publish_content_output
+
+        co = make_content_output(status="approved")
+        mock_db.first.return_value = co
+        admin = make_user(role="admin")
+        admin.google_refresh_token = "token"
+
+        mock_svc = MagicMock()
+        MockService.return_value = mock_svc
+
+        result = publish_content_output(output_id=str(co.id), db=mock_db, current_user=admin)
+        mock_svc.publish_doc.assert_called_once_with(mock_db, co, admin)
+
+    @patch("backend.services.google_docs_service.GoogleDocsService")
+    def test_publish_failure_keeps_approved_status(self, MockService, mock_db, make_user, make_content_output):
+        """When publish fails, status stays 'approved' and error_message is set."""
+        from backend.routes.content_outputs import publish_content_output
+
+        co = make_content_output(status="approved")
+        mock_db.first.return_value = co
+        admin = make_user(role="admin")
+        admin.google_refresh_token = "token"
+
+        mock_svc = MagicMock()
+        mock_svc.publish_doc.side_effect = RuntimeError("API error")
+        MockService.return_value = mock_svc
+
+        result = publish_content_output(output_id=str(co.id), db=mock_db, current_user=admin)
+
+        assert co.status == "approved"
+        assert "API error" in co.error_message
 

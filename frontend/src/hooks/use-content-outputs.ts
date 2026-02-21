@@ -6,6 +6,7 @@ import {
   updateContentOutput,
   changeContentOutputStatus,
   deleteContentOutput,
+  publishContentOutput,
   getStaleContent,
   type ContentOutputFilters,
 } from "@/api/content-outputs";
@@ -68,6 +69,17 @@ export function useDeleteContentOutput() {
     mutationFn: (id: string) => deleteContentOutput(id),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["content-outputs"] });
+    },
+  });
+}
+
+export function usePublishContentOutput() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (id: string) => publishContentOutput(id),
+    onSuccess: (_data, id) => {
+      queryClient.invalidateQueries({ queryKey: ["content-outputs"] });
+      queryClient.invalidateQueries({ queryKey: ["content-outputs", id] });
     },
   });
 }

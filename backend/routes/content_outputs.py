@@ -8,12 +8,12 @@ import uuid
 from datetime import datetime, timezone
 from typing import Any, Optional
 
-from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Query
+from fastapi import APIRouter, Depends, HTTPException, Query
 from backend.services.content_generator import ContentGenerator
 from pydantic import BaseModel
 from sqlalchemy.orm import Session, joinedload
 
-from backend.database import get_db, SessionLocal
+from backend.database import get_db
 from backend.models.analysis_card import AnalysisCard, AnalysisCardCompetitor
 from backend.models.competitor import Competitor
 from backend.models.content_output import ContentOutput
@@ -122,44 +122,6 @@ def _output_to_response(co: ContentOutput) -> dict:
 
 VALID_STATUSES = {"draft", "in_review", "approved", "published", "failed"}
 
-
-# ---------------------------------------------------------------------------
-# Background task helpers
-# ---------------------------------------------------------------------------
-
-def _run_google_docs_publish(content_output_id: str, user_id: str) -> None:
-    """Background task: publish content to Google Docs."""
-    db = SessionLocal()
-    try:
-        from backend.services.google_docs_service import GoogleDocsService
-
-        co = db.query(ContentOutput).options(
-            joinedload(ContentOutput.competitor)
-        ).filter(ContentOutput.id == uuid.UUID(content_output_id)).first()
-        if not co:
-            logger.error("Content output %s not found for Google Docs publish", content_output_id)
-            return
-
-        user = db.query(User).filter(User.id == uuid.UUID(user_id)).first()
-        if not user:
-            logger.error("User %s not found for Google Docs publish", user_id)
-            co.status = "failed"
-            co.error_message = "Approving user not found"
-            db.commit()
-            return
-
-        service = GoogleDocsService()
-        service.create_or_update_doc(db, co, user)
-        logger.info("Google Docs publish complete for output %s", content_output_id)
-    except Exception as e:
-        logger.exception("Google Docs publish failed for output %s", content_output_id)
-        co = db.query(ContentOutput).filter(ContentOutput.id == uuid.UUID(content_output_id)).first()
-        if co:
-            co.status = "failed"
-            co.error_message = f"Google Docs publish failed: {str(e)}"
-            db.commit()
-    finally:
-        db.close()
 
 
 
@@ -416,13 +378,12 @@ def delete_content_output(
 def update_content_output_status(
     output_id: str,
     body: StatusUpdate,
-    background_tasks: BackgroundTasks,
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
     """Change the status of a content output.
 
-    Approval requires admin role and triggers Google Docs publish as a background task.
+    Approval requires admin role.
     """
     if body.status not in VALID_STATUSES:
         raise HTTPException(
@@ -450,12 +411,52 @@ def update_content_output_status(
     db.commit()
     db.refresh(co)
 
-    # Trigger Google Docs publish on approval
-    if body.status == "approved":
-        background_tasks.add_task(
-            _run_google_docs_publish,
-            str(co.id),
-            str(current_user.id),
+    return _output_to_response(co)
+
+
+@router.post("/{output_id}/publish", response_model=ContentOutputResponse, status_code=200)
+def publish_content_output(
+    output_id: str,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """Publish approved content to Google Docs.
+
+    Requires admin role. Only approved content can be published.
+    Checks for Google credentials before attempting.
+    Calls Google Docs service synchronously.
+    On failure: keeps status as 'approved', stores error in error_message.
+    """
+    if current_user.role != "admin":
+        raise HTTPException(status_code=403, detail="Only admins can publish content")
+
+    co = db.query(ContentOutput).options(
+        joinedload(ContentOutput.competitor)
+    ).filter(ContentOutput.id == uuid.UUID(output_id)).first()
+    if not co:
+        raise HTTPException(status_code=404, detail="Content output not found")
+
+    if co.status != "approved":
+        raise HTTPException(status_code=400, detail="Only approved content can be published")
+
+    if not current_user.google_refresh_token:
+        raise HTTPException(
+            status_code=400,
+            detail="Google credentials not configured. Please sign out and sign back in to grant Google Docs permissions.",
         )
 
+    try:
+        from backend.services.google_docs_service import GoogleDocsService
+        service = GoogleDocsService()
+        service.publish_doc(db, co, current_user)
+    except Exception as e:
+        logger.exception("Google Docs publish failed for output %s", co.id)
+        co.error_message = f"Google Docs publish failed: {str(e)}"
+        db.commit()
+        # Keep status as "approved" — don't revert to "failed"
+
+    # Reload for serialization
+    co = db.query(ContentOutput).options(
+        joinedload(ContentOutput.competitor)
+    ).filter(ContentOutput.id == co.id).first()
     return _output_to_response(co)

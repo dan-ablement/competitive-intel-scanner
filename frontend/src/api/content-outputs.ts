@@ -52,6 +52,11 @@ export async function deleteContentOutput(id: string): Promise<void> {
   await apiClient.delete(`/content-outputs/${id}`);
 }
 
+export async function publishContentOutput(id: string): Promise<ContentOutput> {
+  const { data } = await apiClient.post<ContentOutput>(`/content-outputs/${id}/publish`);
+  return data;
+}
+
 export async function getStaleContent(): Promise<StaleContentItem[]> {
   const { data } = await apiClient.get<StaleContentItem[]>("/content-outputs/stale");
   return data;

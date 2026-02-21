@@ -15,58 +15,44 @@ logger = logging.getLogger(__name__)
 class GoogleDocsService:
     """Creates/updates Google Docs from content output data using per-user OAuth credentials."""
 
-    def create_or_update_doc(
+    def publish_doc(
         self,
         db: Session,
         content_output: Any,
         user: Any,
     ) -> None:
-        """Create a new Google Doc or update an existing one for the given content_output.
+        """Create or update a Google Doc for the content output.
 
-        Uses the approving user's stored OAuth credentials (refresh token).
-        If google_doc_id is None: creates a new doc in the configured folder.
-        If google_doc_id exists: clears and rewrites the existing doc.
-        Stores google_doc_id and google_doc_url back on the content_output.
-        On failure: sets status to 'failed' with error_message.
+        Raises an exception if credentials are missing or publish fails.
+        Sets google_doc_id, google_doc_url, published_at, and status on success.
+        Does NOT set status on failure — caller handles that.
         """
-        try:
-            credentials = self._build_credentials(user)
-            if credentials is None:
-                content_output.status = "failed"
-                content_output.error_message = "Google credentials not configured. Please re-authenticate with Google to grant document permissions."
-                db.commit()
-                return
+        credentials = self._build_credentials(user)
+        if credentials is None:
+            raise ValueError("Google credentials not configured. Please re-authenticate.")
 
-            from googleapiclient.discovery import build
+        from googleapiclient.discovery import build
 
-            docs_service = build("docs", "v1", credentials=credentials)
-            drive_service = build("drive", "v3", credentials=credentials)
+        docs_service = build("docs", "v1", credentials=credentials)
+        drive_service = build("drive", "v3", credentials=credentials)
 
-            sections = self._parse_content(content_output.content)
-            title = content_output.title or "Untitled Content"
+        sections = self._parse_content(content_output.content)
+        title = content_output.title or "Untitled Content"
 
-            if content_output.google_doc_id:
-                # Update existing doc
-                self._update_existing_doc(docs_service, content_output.google_doc_id, title, sections)
-                logger.info("Updated existing Google Doc: %s", content_output.google_doc_id)
-            else:
-                # Create new doc
-                doc_id, doc_url = self._create_new_doc(
-                    docs_service, drive_service, title, sections, db
-                )
-                content_output.google_doc_id = doc_id
-                content_output.google_doc_url = doc_url
-                logger.info("Created new Google Doc: %s", doc_id)
+        if content_output.google_doc_id:
+            self._update_existing_doc(docs_service, content_output.google_doc_id, title, sections)
+            logger.info("Updated existing Google Doc: %s", content_output.google_doc_id)
+        else:
+            doc_id, doc_url = self._create_new_doc(
+                docs_service, drive_service, title, sections, db
+            )
+            content_output.google_doc_id = doc_id
+            content_output.google_doc_url = doc_url
+            logger.info("Created new Google Doc: %s", doc_id)
 
-            content_output.status = "published"
-            content_output.published_at = datetime.now(timezone.utc)
-            db.commit()
-
-        except Exception as e:
-            logger.exception("Google Docs publish failed for content_output %s", content_output.id)
-            content_output.status = "failed"
-            content_output.error_message = f"Google Docs publish failed: {str(e)}"
-            db.commit()
+        content_output.status = "published"
+        content_output.published_at = datetime.now(timezone.utc)
+        db.commit()
 
     def _build_credentials(self, user: Any):
         """Build Google OAuth credentials from user's stored tokens.
