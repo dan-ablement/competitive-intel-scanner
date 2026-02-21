@@ -120,7 +120,7 @@ def _output_to_response(co: ContentOutput) -> dict:
     }
 
 
-VALID_STATUSES = {"draft", "generating", "in_review", "approved", "published", "failed"}
+VALID_STATUSES = {"draft", "in_review", "approved", "published", "failed"}
 
 
 # ---------------------------------------------------------------------------
@@ -316,14 +316,14 @@ def generate_content(
     if not template:
         raise HTTPException(status_code=404, detail="Template not found or inactive")
 
-    # Create content output record with "generating" status
+    # Create content output record with "draft" status
     co = ContentOutput(
         competitor_id=uuid.UUID(body.competitor_id),
         content_type=template.content_type,
         title="",
         content="",
         version=1,
-        status="generating",
+        status="draft",
         template_id=uuid.UUID(body.template_id),
     )
     db.add(co)

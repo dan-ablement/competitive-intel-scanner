@@ -23,7 +23,7 @@ class ContentOutput(Base):
     source_card_ids: Mapped[dict | None] = mapped_column(JSONB, nullable=True)
     version: Mapped[int] = mapped_column(Integer, nullable=False, default=1)
     status: Mapped[str] = mapped_column(
-        SAEnum("draft", "generating", "in_review", "approved", "published", "failed", name="content_output_status"),
+        SAEnum("draft", "in_review", "approved", "published", "failed", name="content_output_status"),
         default="draft",
         nullable=False,
     )
