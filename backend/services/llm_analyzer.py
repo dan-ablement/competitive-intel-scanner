@@ -277,6 +277,9 @@ class LLMAnalyzer:
         if priority not in VALID_PRIORITIES:
             priority = "green"
 
+        # Green-priority cards are auto-approved; red/yellow remain draft
+        status = "approved" if priority == "green" else "draft"
+
         card = AnalysisCard(
             id=uuid.uuid4(),
             feed_item_id=item.id,
@@ -284,10 +287,10 @@ class LLMAnalyzer:
             priority=priority,
             title=parsed.get("title", item.title),
             summary=parsed.get("summary", ""),
-            impact_assessment=parsed.get("impact_assessment", ""),
-            suggested_counter_moves=parsed.get("suggested_counter_moves", ""),
+            impact_assessment="",
+            suggested_counter_moves="",
             raw_llm_output=parsed,
-            status="draft",
+            status=status,
             check_run_id=check_run_id,
         )
         db.add(card)
