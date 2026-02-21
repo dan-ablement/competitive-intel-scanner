@@ -166,7 +166,7 @@ function BriefingSection({ briefings }: { briefings: Briefing[] }) {
         {cardCount} analysis {cardCount === 1 ? "card" : "cards"} included
       </p>
       <span className="mt-3 inline-flex items-center gap-1 text-sm font-medium text-primary">
-        View briefing <ArrowRight className="h-3.5 w-3.5" />
+        Review &amp; approve today&apos;s briefing <ArrowRight className="h-3.5 w-3.5" />
       </span>
     </Link>
   );
@@ -283,17 +283,17 @@ function PendingItemRow({
 }
 
 function PendingItemsSection({
-  draftCards,
+  draftBriefings,
   inReviewCards,
   pendingSuggestions,
   suggestedCompetitors,
 }: {
-  draftCards: number;
+  draftBriefings: number;
   inReviewCards: number;
   pendingSuggestions: number;
   suggestedCompetitors: number;
 }) {
-  const total = draftCards + inReviewCards + pendingSuggestions + suggestedCompetitors;
+  const total = draftBriefings + inReviewCards + pendingSuggestions + suggestedCompetitors;
 
   return (
     <div className="rounded-lg border border-border bg-card p-6">
@@ -313,10 +313,10 @@ function PendingItemsSection({
       ) : (
         <div className="mt-3 divide-y divide-border">
           <PendingItemRow
-            icon={CreditCard}
-            label="Draft cards needing review"
-            count={draftCards}
-            to="/cards"
+            icon={FileText}
+            label="Briefings needing review"
+            count={draftBriefings}
+            to="/briefings"
           />
           <PendingItemRow
             icon={Eye}
@@ -562,7 +562,7 @@ export default function Dashboard() {
   const greenCount = recentCards.filter((c) => c.priority === "green").length;
 
   // Pending counts
-  const draftCards = (cards ?? []).filter((c) => c.status === "draft").length;
+  const draftBriefings = (briefings ?? []).filter((b) => b.status === "draft").length;
   const inReviewCards = (cards ?? []).filter((c) => c.status === "in_review").length;
   const pendingSuggestions = (suggestions ?? []).filter((s) => s.status === "pending").length;
   const suggestedCount = (suggestedCompetitors ?? []).length;
@@ -593,7 +593,7 @@ export default function Dashboard() {
       {/* Pending items + Recent cards row */}
       <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
         <PendingItemsSection
-          draftCards={draftCards}
+          draftBriefings={draftBriefings}
           inReviewCards={inReviewCards}
           pendingSuggestions={pendingSuggestions}
           suggestedCompetitors={suggestedCount}
