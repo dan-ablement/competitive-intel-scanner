@@ -21,3 +21,13 @@ export async function changeBriefingStatus(id: string, status: BriefingStatus): 
   return data;
 }
 
+export interface ApproveAllResponse {
+  message: string;
+  cards_approved: number;
+}
+
+export async function approveAllBriefingCards(briefingId: string): Promise<ApproveAllResponse> {
+  const { data } = await apiClient.post<ApproveAllResponse>(`/briefings/${briefingId}/approve-all`);
+  return data;
+}
+

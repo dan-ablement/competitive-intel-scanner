@@ -20,7 +20,6 @@ import {
   ArrowRight,
   Users,
   Lightbulb,
-  Eye,
   RefreshCw,
   Leaf,
 } from "lucide-react";
@@ -284,16 +283,14 @@ function PendingItemRow({
 
 function PendingItemsSection({
   draftBriefings,
-  inReviewCards,
   pendingSuggestions,
   suggestedCompetitors,
 }: {
   draftBriefings: number;
-  inReviewCards: number;
   pendingSuggestions: number;
   suggestedCompetitors: number;
 }) {
-  const total = draftBriefings + inReviewCards + pendingSuggestions + suggestedCompetitors;
+  const total = draftBriefings + pendingSuggestions + suggestedCompetitors;
 
   return (
     <div className="rounded-lg border border-border bg-card p-6">
@@ -317,12 +314,6 @@ function PendingItemsSection({
             label="Briefings needing review"
             count={draftBriefings}
             to="/briefings"
-          />
-          <PendingItemRow
-            icon={Eye}
-            label="Cards in review needing approval"
-            count={inReviewCards}
-            to="/cards"
           />
           <PendingItemRow
             icon={Lightbulb}
@@ -563,12 +554,29 @@ export default function Dashboard() {
 
   // Pending counts
   const draftBriefings = (briefings ?? []).filter((b) => b.status === "draft").length;
-  const inReviewCards = (cards ?? []).filter((c) => c.status === "in_review").length;
   const pendingSuggestions = (suggestions ?? []).filter((s) => s.status === "pending").length;
   const suggestedCount = (suggestedCompetitors ?? []).length;
 
+  // Red alert: red-priority draft cards in the last 24h
+  const redDraftCards = recentCards.filter((c) => c.priority === "red" && c.status === "draft");
+  const todayBriefing = (briefings ?? []).find((b) => b.date === todayDateString());
+
   return (
     <div className="space-y-6">
+      {/* Red alert banner */}
+      {redDraftCards.length > 0 && (
+        <Link
+          to={todayBriefing ? `/briefings/${todayBriefing.id}` : "/cards?priority=red"}
+          className="flex items-center gap-3 rounded-lg border border-red-300 bg-red-50 px-4 py-3 transition-colors hover:bg-red-100"
+        >
+          <span className="text-lg">🔴</span>
+          <span className="text-sm font-semibold text-red-800">
+            {redDraftCards.length} high-priority {redDraftCards.length === 1 ? "item needs" : "items need"} review
+          </span>
+          <ArrowRight className="ml-auto h-4 w-4 text-red-600" />
+        </Link>
+      )}
+
       {/* Header */}
       <div>
         <h1 className="text-2xl font-bold">Dashboard</h1>
@@ -594,7 +602,6 @@ export default function Dashboard() {
       <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
         <PendingItemsSection
           draftBriefings={draftBriefings}
-          inReviewCards={inReviewCards}
           pendingSuggestions={pendingSuggestions}
           suggestedCompetitors={suggestedCount}
         />

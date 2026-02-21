@@ -1,5 +1,5 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { listBriefings, getBriefing, updateBriefing, changeBriefingStatus } from "@/api/briefings";
+import { listBriefings, getBriefing, updateBriefing, changeBriefingStatus, approveAllBriefingCards } from "@/api/briefings";
 import type { Briefing, BriefingStatus } from "@/types";
 
 export function useBriefings() {
@@ -30,6 +30,17 @@ export function useChangeBriefingStatus() {
   return useMutation({
     mutationFn: ({ id, status }: { id: string; status: BriefingStatus }) => changeBriefingStatus(id, status),
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ["briefings"] }),
+  });
+}
+
+export function useApproveAllBriefingCards() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (briefingId: string) => approveAllBriefingCards(briefingId),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["briefings"] });
+      queryClient.invalidateQueries({ queryKey: ["cards"] });
+    },
   });
 }
 
