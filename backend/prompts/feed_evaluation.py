@@ -25,8 +25,6 @@ Respond with JSON:
   "priority_reasoning": string,
   "title": string,
   "summary": string,
-  "impact_assessment": string,
-  "suggested_counter_moves": string,
   "competitor_names": [string],
   "suggested_new_competitor": {{ "name": string, "description": string, "reason": string }} | null
 }}

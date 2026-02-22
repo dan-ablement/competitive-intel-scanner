@@ -53,8 +53,6 @@ class CardResponse(BaseModel):
 class CardUpdate(BaseModel):
     title: Optional[str] = None
     summary: Optional[str] = None
-    impact_assessment: Optional[str] = None
-    suggested_counter_moves: Optional[str] = None
     event_type: Optional[str] = None
     priority: Optional[str] = None
 
@@ -133,7 +131,7 @@ VALID_EVENT_TYPES = {
 }
 
 # Fields that are tracked for edit history
-TRACKED_FIELDS = {"title", "summary", "impact_assessment", "suggested_counter_moves", "event_type", "priority"}
+TRACKED_FIELDS = {"title", "summary", "event_type", "priority"}
 
 
 def _comment_to_response(comment: AnalysisCardComment) -> dict:

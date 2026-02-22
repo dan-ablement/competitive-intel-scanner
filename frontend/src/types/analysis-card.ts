@@ -26,8 +26,8 @@ export interface AnalysisCard {
   priority: Priority;
   title: string;
   summary: string;
-  impact_assessment: string;
-  suggested_counter_moves: string;
+  impact_assessment?: string;
+  suggested_counter_moves?: string;
   raw_llm_output: Record<string, unknown>;
   status: CardStatus;
   approved_by: string | null;

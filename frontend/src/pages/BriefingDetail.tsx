@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { useParams, useNavigate, Link } from "react-router-dom";
-import { useBriefing, useUpdateBriefing, useChangeBriefingStatus } from "@/hooks/use-briefings";
+import { useBriefing, useUpdateBriefing, useChangeBriefingStatus, useApproveAllBriefingCards } from "@/hooks/use-briefings";
 import { useAuth } from "@/contexts/AuthContext";
 import type { BriefingStatus, BriefingCard } from "@/types";
 import { cn } from "@/lib/utils";
@@ -207,12 +207,15 @@ function LinkedCards({ cards }: { cards: BriefingCard[] }) {
 export default function BriefingDetail() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
+  const { user } = useAuth();
   const { data: briefing, isLoading, error, refetch } = useBriefing(id!);
   const updateMutation = useUpdateBriefing();
   const statusMutation = useChangeBriefingStatus();
+  const approveAllMutation = useApproveAllBriefingCards();
 
   const [content, setContent] = useState("");
   const [saved, setSaved] = useState(false);
+  const [approvedCount, setApprovedCount] = useState<number | null>(null);
 
   useEffect(() => {
     if (briefing) {
@@ -231,6 +234,14 @@ export default function BriefingDetail() {
   const handleStatusChange = async (status: BriefingStatus) => {
     if (!id) return;
     await statusMutation.mutateAsync({ id, status });
+  };
+
+  const handleApproveAll = async () => {
+    if (!id) return;
+    setApprovedCount(null);
+    const result = await approveAllMutation.mutateAsync(id);
+    setApprovedCount(result.cards_approved);
+    setTimeout(() => setApprovedCount(null), 5000);
   };
 
   if (isLoading) {
@@ -336,6 +347,36 @@ export default function BriefingDetail() {
             </div>
             <LinkedCards cards={briefing.cards ?? []} />
           </div>
+
+          {/* Approve All Cards — admin only, draft or in_review */}
+          {user?.role === "admin" && (briefing.status === "draft" || briefing.status === "in_review") && (briefing.cards?.length ?? 0) > 0 && (
+            <div className="space-y-2">
+              <button
+                onClick={handleApproveAll}
+                disabled={approveAllMutation.isPending}
+                className="inline-flex w-full items-center justify-center gap-2 rounded-md bg-green-600 px-4 py-2.5 text-sm font-medium text-white transition-colors hover:bg-green-700 disabled:opacity-50"
+              >
+                {approveAllMutation.isPending ? (
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                ) : (
+                  <CheckCircle2 className="h-4 w-4" />
+                )}
+                {approveAllMutation.isPending
+                  ? "Approving..."
+                  : `Approve all ${briefing.cards?.length ?? 0} cards`}
+              </button>
+              {approvedCount !== null && (
+                <div className="rounded-md border border-green-200 bg-green-50 p-2.5 text-center text-sm text-green-800">
+                  ✓ {approvedCount} {approvedCount === 1 ? "card" : "cards"} approved
+                </div>
+              )}
+              {approveAllMutation.isError && (
+                <div className="rounded-md border border-destructive/50 bg-destructive/10 p-2.5 text-center text-sm text-destructive">
+                  Failed to approve cards. Please try again.
+                </div>
+              )}
+            </div>
+          )}
 
           {/* Metadata */}
           <div className="rounded-lg border border-border bg-card p-4">

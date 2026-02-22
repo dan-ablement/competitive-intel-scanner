@@ -1,9 +1,12 @@
+import { useState } from "react";
 import { Link } from "react-router-dom";
 import { useBriefings } from "@/hooks/use-briefings";
 import { useCards } from "@/hooks/use-cards";
 import { useCheckRuns } from "@/hooks/use-system";
 import { useSuggestions } from "@/hooks/use-suggestions";
 import { useCompetitors } from "@/hooks/use-competitors";
+import { useStaleContent, useGenerateDraft } from "@/hooks/use-content-outputs";
+import type { StaleContentItem } from "@/api/content-outputs";
 import type { AnalysisCard, Priority, CheckRun, Briefing } from "@/types";
 import { cn } from "@/lib/utils";
 import {
@@ -17,8 +20,8 @@ import {
   ArrowRight,
   Users,
   Lightbulb,
-  Eye,
   RefreshCw,
+  Leaf,
 } from "lucide-react";
 
 // ---------------------------------------------------------------------------
@@ -162,7 +165,7 @@ function BriefingSection({ briefings }: { briefings: Briefing[] }) {
         {cardCount} analysis {cardCount === 1 ? "card" : "cards"} included
       </p>
       <span className="mt-3 inline-flex items-center gap-1 text-sm font-medium text-primary">
-        View briefing <ArrowRight className="h-3.5 w-3.5" />
+        Review &amp; approve today&apos;s briefing <ArrowRight className="h-3.5 w-3.5" />
       </span>
     </Link>
   );
@@ -224,8 +227,19 @@ function CheckRunSection({ runs }: { runs: CheckRun[] }) {
           <div className="text-xs text-muted-foreground">Items found</div>
         </div>
         <div>
-          <div className="text-xl font-bold">{latest.cards_generated}</div>
-          <div className="text-xs text-muted-foreground">Cards generated</div>
+          {latest.cards_generated === 0 && latest.new_items_found > 0 ? (
+            <>
+              <div className="flex items-center justify-center gap-1 text-xl font-bold text-blue-600">
+                <Loader2 className="h-4 w-4 animate-spin" />
+              </div>
+              <div className="text-xs text-blue-600">Analysis in progress</div>
+            </>
+          ) : (
+            <>
+              <div className="text-xl font-bold">{latest.cards_generated}</div>
+              <div className="text-xs text-muted-foreground">Cards generated</div>
+            </>
+          )}
         </div>
       </div>
       <div className="mt-3 text-xs text-muted-foreground">
@@ -268,17 +282,15 @@ function PendingItemRow({
 }
 
 function PendingItemsSection({
-  draftCards,
-  inReviewCards,
+  draftBriefings,
   pendingSuggestions,
   suggestedCompetitors,
 }: {
-  draftCards: number;
-  inReviewCards: number;
+  draftBriefings: number;
   pendingSuggestions: number;
   suggestedCompetitors: number;
 }) {
-  const total = draftCards + inReviewCards + pendingSuggestions + suggestedCompetitors;
+  const total = draftBriefings + pendingSuggestions + suggestedCompetitors;
 
   return (
     <div className="rounded-lg border border-border bg-card p-6">
@@ -298,16 +310,10 @@ function PendingItemsSection({
       ) : (
         <div className="mt-3 divide-y divide-border">
           <PendingItemRow
-            icon={CreditCard}
-            label="Draft cards needing review"
-            count={draftCards}
-            to="/cards"
-          />
-          <PendingItemRow
-            icon={Eye}
-            label="Cards in review needing approval"
-            count={inReviewCards}
-            to="/cards"
+            icon={FileText}
+            label="Briefings needing review"
+            count={draftBriefings}
+            to="/briefings"
           />
           <PendingItemRow
             icon={Lightbulb}
@@ -393,6 +399,109 @@ function RecentCardsSection({ cards }: { cards: AnalysisCard[] }) {
 }
 
 // ---------------------------------------------------------------------------
+// Stale Content Section
+// ---------------------------------------------------------------------------
+
+function StaleContentCard({ item }: { item: StaleContentItem }) {
+  const generateDraft = useGenerateDraft();
+  const [generating, setGenerating] = useState(false);
+
+  const handleGenerate = async () => {
+    if (!item.template_id) return;
+    setGenerating(true);
+    try {
+      await generateDraft.mutateAsync({
+        competitorId: item.competitor_id,
+        templateId: item.template_id,
+      });
+    } finally {
+      setGenerating(false);
+    }
+  };
+
+  const staleness = (() => {
+    if (!item.last_output_at) return "Never generated";
+    const days = Math.floor(
+      (Date.now() - new Date(item.last_output_at).getTime()) / (1000 * 60 * 60 * 24)
+    );
+    return `${days} day${days !== 1 ? "s" : ""} out of date`;
+  })();
+
+  return (
+    <div className="flex items-center justify-between rounded-md border border-border px-4 py-3">
+      <div className="min-w-0 flex-1">
+        <div className="flex items-center gap-2">
+          <span className="text-sm font-semibold">{item.competitor_name}</span>
+          <span className="rounded-full bg-muted px-2 py-0.5 text-xs font-medium text-muted-foreground">
+            {item.content_type.replace(/_/g, " ")}
+          </span>
+        </div>
+        <p className="mt-0.5 text-xs text-muted-foreground">{staleness}</p>
+      </div>
+      <button
+        onClick={handleGenerate}
+        disabled={generating}
+        className="inline-flex items-center gap-1.5 rounded-md bg-primary px-3 py-1.5 text-sm font-medium text-primary-foreground hover:bg-primary/90 disabled:opacity-50"
+      >
+        {generating ? (
+          <Loader2 className="h-3.5 w-3.5 animate-spin" />
+        ) : (
+          <RefreshCw className="h-3.5 w-3.5" />
+        )}
+        Generate Draft
+      </button>
+    </div>
+  );
+}
+
+function StaleContentSection() {
+  const { data: staleItems, isLoading } = useStaleContent();
+
+  if (isLoading) {
+    return (
+      <div className="rounded-lg border border-border bg-card p-6">
+        <div className="flex items-center gap-2">
+          <Leaf className="h-5 w-5 text-muted-foreground" />
+          <h2 className="text-lg font-semibold">Content Freshness</h2>
+        </div>
+        <div className="mt-4 flex justify-center">
+          <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="rounded-lg border border-border bg-card p-6">
+      <div className="flex items-center gap-2">
+        <Leaf className="h-5 w-5 text-muted-foreground" />
+        <h2 className="text-lg font-semibold">Content Freshness</h2>
+        {staleItems && staleItems.length > 0 && (
+          <span className="rounded-full bg-amber-100 px-2 py-0.5 text-xs font-semibold text-amber-800">
+            {staleItems.length}
+          </span>
+        )}
+      </div>
+      {!staleItems || staleItems.length === 0 ? (
+        <div className="mt-3 flex items-center gap-2 text-sm text-green-700">
+          <CheckCircle2 className="h-4 w-4" />
+          All content up to date
+        </div>
+      ) : (
+        <div className="mt-3 space-y-2">
+          {staleItems.map((item) => (
+            <StaleContentCard
+              key={`${item.competitor_id}-${item.template_id ?? item.content_type}`}
+              item={item}
+            />
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
 // Main Dashboard
 // ---------------------------------------------------------------------------
 
@@ -444,13 +553,30 @@ export default function Dashboard() {
   const greenCount = recentCards.filter((c) => c.priority === "green").length;
 
   // Pending counts
-  const draftCards = (cards ?? []).filter((c) => c.status === "draft").length;
-  const inReviewCards = (cards ?? []).filter((c) => c.status === "in_review").length;
+  const draftBriefings = (briefings ?? []).filter((b) => b.status === "draft").length;
   const pendingSuggestions = (suggestions ?? []).filter((s) => s.status === "pending").length;
   const suggestedCount = (suggestedCompetitors ?? []).length;
 
+  // Red alert: red-priority draft cards in the last 24h
+  const redDraftCards = recentCards.filter((c) => c.priority === "red" && c.status === "draft");
+  const todayBriefing = (briefings ?? []).find((b) => b.date === todayDateString());
+
   return (
     <div className="space-y-6">
+      {/* Red alert banner */}
+      {redDraftCards.length > 0 && (
+        <Link
+          to={todayBriefing ? `/briefings/${todayBriefing.id}` : "/cards?priority=red"}
+          className="flex items-center gap-3 rounded-lg border border-red-300 bg-red-50 px-4 py-3 transition-colors hover:bg-red-100"
+        >
+          <span className="text-lg">🔴</span>
+          <span className="text-sm font-semibold text-red-800">
+            {redDraftCards.length} high-priority {redDraftCards.length === 1 ? "item needs" : "items need"} review
+          </span>
+          <ArrowRight className="ml-auto h-4 w-4 text-red-600" />
+        </Link>
+      )}
+
       {/* Header */}
       <div>
         <h1 className="text-2xl font-bold">Dashboard</h1>
@@ -475,13 +601,15 @@ export default function Dashboard() {
       {/* Pending items + Recent cards row */}
       <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
         <PendingItemsSection
-          draftCards={draftCards}
-          inReviewCards={inReviewCards}
+          draftBriefings={draftBriefings}
           pendingSuggestions={pendingSuggestions}
           suggestedCompetitors={suggestedCount}
         />
         <RecentCardsSection cards={cards ?? []} />
       </div>
+
+      {/* Content Freshness */}
+      <StaleContentSection />
     </div>
   );
 }

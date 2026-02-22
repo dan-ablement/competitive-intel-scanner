@@ -1,0 +1,462 @@
+"""Content Outputs routes — CRUD, generate, status changes, stale content detection."""
+
+from __future__ import annotations
+
+import json
+import logging
+import uuid
+from datetime import datetime, timezone
+from typing import Any, Optional
+
+from fastapi import APIRouter, Depends, HTTPException, Query
+from backend.services.content_generator import ContentGenerator
+from pydantic import BaseModel
+from sqlalchemy.orm import Session, joinedload
+
+from backend.database import get_db
+from backend.models.analysis_card import AnalysisCard, AnalysisCardCompetitor
+from backend.models.competitor import Competitor
+from backend.models.content_output import ContentOutput
+from backend.models.content_template import ContentTemplate
+from backend.models.user import User
+from backend.routes.auth import get_current_user
+from backend.utils import utc_isoformat
+
+router = APIRouter()
+logger = logging.getLogger(__name__)
+
+
+# ---------------------------------------------------------------------------
+# Pydantic schemas
+# ---------------------------------------------------------------------------
+
+class ContentOutputResponse(BaseModel):
+    id: str
+    competitor_id: str
+    competitor_name: str
+    content_type: str
+    title: Optional[str] = None
+    content: str
+    sections: Optional[list[dict]] = None
+    source_card_ids: Optional[list[str]] = None
+    version: int
+    status: str
+    template_id: Optional[str] = None
+    google_doc_id: Optional[str] = None
+    google_doc_url: Optional[str] = None
+    approved_by: Optional[str] = None
+    approved_at: Optional[str] = None
+    published_at: Optional[str] = None
+    error_message: Optional[str] = None
+    created_at: str
+    updated_at: str
+
+
+class ContentOutputCreate(BaseModel):
+    competitor_id: str
+    template_id: str
+
+
+class ContentOutputUpdate(BaseModel):
+    title: Optional[str] = None
+    content: Optional[str] = None
+
+
+class StatusUpdate(BaseModel):
+    status: str
+
+
+class StaleContentItem(BaseModel):
+    competitor_id: str
+    competitor_name: str
+    content_type: str
+    template_id: Optional[str] = None
+    template_name: Optional[str] = None
+    last_output_id: Optional[str] = None
+    last_output_at: Optional[str] = None
+    status: str  # 'stale' or 'missing'
+    days_stale: Optional[int] = None
+
+
+# ---------------------------------------------------------------------------
+# Helpers
+# ---------------------------------------------------------------------------
+
+def _output_to_response(co: ContentOutput) -> dict:
+    """Serialize a ContentOutput to a dict matching ContentOutputResponse."""
+    competitor_name = ""
+    if co.competitor:
+        competitor_name = co.competitor.name
+
+    # Parse content as sections if it's JSON
+    sections = None
+    try:
+        parsed = json.loads(co.content) if co.content else None
+        if isinstance(parsed, dict):
+            sections = [{"title": k, "body": v} for k, v in parsed.items()]
+    except (json.JSONDecodeError, TypeError):
+        pass
+
+    return {
+        "id": str(co.id),
+        "competitor_id": str(co.competitor_id),
+        "competitor_name": competitor_name,
+        "content_type": co.content_type or "",
+        "title": co.title or "",
+        "content": co.content or "",
+        "sections": sections or [],
+        "source_card_ids": co.source_card_ids or [],
+        "version": co.version,
+        "status": co.status,
+        "template_id": str(co.template_id) if co.template_id else None,
+        "google_doc_id": co.google_doc_id,
+        "google_doc_url": co.google_doc_url,
+        "approved_by": str(co.approved_by) if co.approved_by else None,
+        "approved_at": utc_isoformat(co.approved_at),
+        "published_at": utc_isoformat(co.published_at),
+        "error_message": co.error_message,
+        "created_at": utc_isoformat(co.created_at),
+        "updated_at": utc_isoformat(co.updated_at),
+    }
+
+
+VALID_STATUSES = {"draft", "in_review", "approved", "published", "failed"}
+
+
+
+
+# ---------------------------------------------------------------------------
+# Route handlers
+# ---------------------------------------------------------------------------
+
+@router.get("", response_model=list[ContentOutputResponse])
+def list_content_outputs(
+    competitor_id: Optional[str] = Query(None),
+    content_type: Optional[str] = Query(None),
+    status: Optional[str] = Query(None),
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """List content outputs with optional filters."""
+    query = db.query(ContentOutput).options(joinedload(ContentOutput.competitor))
+
+    if competitor_id:
+        query = query.filter(ContentOutput.competitor_id == uuid.UUID(competitor_id))
+    if content_type:
+        query = query.filter(ContentOutput.content_type == content_type)
+    if status:
+        query = query.filter(ContentOutput.status == status)
+
+    outputs = query.order_by(ContentOutput.updated_at.desc()).all()
+    return [_output_to_response(co) for co in outputs]
+
+
+@router.get("/stale", response_model=list[StaleContentItem])
+def get_stale_content(
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """Get stale and missing content items.
+
+    Stale: a competitor has approved analysis cards newer than the latest
+    published/approved content_output for that content_type.
+    Missing: a competitor has content_types configured but no content_output at all.
+    """
+    competitors = db.query(Competitor).filter(Competitor.is_active == True).all()
+
+    # Pre-load content templates keyed by content_type for lookups
+    templates = db.query(ContentTemplate).all()
+    template_by_type: dict[str, ContentTemplate] = {t.content_type: t for t in templates}
+
+    results: list[dict] = []
+
+    for comp in competitors:
+        configured_types = comp.content_types or []
+        if not isinstance(configured_types, list):
+            continue
+
+        for ct in configured_types:
+            # Look up template for this content_type
+            tmpl = template_by_type.get(ct)
+
+            # Find latest content output for this competitor + content_type
+            latest_co = (
+                db.query(ContentOutput)
+                .filter(
+                    ContentOutput.competitor_id == comp.id,
+                    ContentOutput.content_type == ct,
+                    ContentOutput.status.in_(["approved", "published"]),
+                )
+                .order_by(ContentOutput.updated_at.desc())
+                .first()
+            )
+
+            if not latest_co:
+                # Missing: no content output exists
+                results.append({
+                    "competitor_id": str(comp.id),
+                    "competitor_name": comp.name,
+                    "content_type": ct,
+                    "template_id": str(tmpl.id) if tmpl else None,
+                    "template_name": tmpl.name if tmpl else None,
+                    "last_output_id": None,
+                    "last_output_at": None,
+                    "status": "missing",
+                    "days_stale": None,
+                })
+                continue
+
+            # Check if there are approved analysis cards newer than the content output
+            latest_card = (
+                db.query(AnalysisCard)
+                .join(AnalysisCardCompetitor)
+                .filter(
+                    AnalysisCardCompetitor.competitor_id == comp.id,
+                    AnalysisCard.status == "approved",
+                    AnalysisCard.approved_at > latest_co.updated_at,
+                )
+                .order_by(AnalysisCard.approved_at.desc())
+                .first()
+            )
+
+            if latest_card:
+                days_stale = (datetime.now(timezone.utc) - latest_co.updated_at.replace(tzinfo=timezone.utc)).days
+                results.append({
+                    "competitor_id": str(comp.id),
+                    "competitor_name": comp.name,
+                    "content_type": ct,
+                    "template_id": str(tmpl.id) if tmpl else None,
+                    "template_name": tmpl.name if tmpl else None,
+                    "last_output_id": str(latest_co.id),
+                    "last_output_at": utc_isoformat(latest_co.updated_at),
+                    "status": "stale",
+                    "days_stale": days_stale,
+                })
+
+    return results
+
+
+@router.get("/{output_id}", response_model=ContentOutputResponse)
+def get_content_output(
+    output_id: str,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """Get a single content output by ID."""
+    co = (
+        db.query(ContentOutput)
+        .options(joinedload(ContentOutput.competitor))
+        .filter(ContentOutput.id == uuid.UUID(output_id))
+        .first()
+    )
+    if not co:
+        raise HTTPException(status_code=404, detail="Content output not found")
+    return _output_to_response(co)
+
+
+@router.post("/generate", response_model=ContentOutputResponse, status_code=200)
+def generate_content(
+    body: ContentOutputCreate,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """Generate content for a competitor + template synchronously.
+
+    Creates a ContentOutput, calls the LLM inline, and returns the
+    completed (or failed) content output.
+    """
+    # Validate competitor exists
+    competitor = db.query(Competitor).filter(Competitor.id == uuid.UUID(body.competitor_id)).first()
+    if not competitor:
+        raise HTTPException(status_code=404, detail="Competitor not found")
+
+    # Validate template exists and is active
+    template = db.query(ContentTemplate).filter(
+        ContentTemplate.id == uuid.UUID(body.template_id),
+        ContentTemplate.is_active == True,
+    ).first()
+    if not template:
+        raise HTTPException(status_code=404, detail="Template not found or inactive")
+
+    # Create content output record with "draft" status
+    co = ContentOutput(
+        competitor_id=uuid.UUID(body.competitor_id),
+        content_type=template.content_type,
+        title="",
+        content="",
+        version=1,
+        status="draft",
+        template_id=uuid.UUID(body.template_id),
+    )
+    db.add(co)
+    db.commit()
+    db.refresh(co)
+
+    # Generate content SYNCHRONOUSLY
+    try:
+        generator = ContentGenerator()
+        result = generator.generate_content(
+            db,
+            competitor_id=uuid.UUID(body.competitor_id),
+            template_id=uuid.UUID(body.template_id),
+        )
+
+        co.content = result.get("content", "")
+        co.raw_llm_output = result.get("raw_llm_output")
+        co.source_card_ids = result.get("source_card_ids", [])
+        co.content_type = result.get("content_type", co.content_type)
+
+        # Generate title from template + competitor
+        if template and competitor and template.doc_name_pattern:
+            co.title = template.doc_name_pattern.replace("{competitor}", competitor.name)
+        elif competitor:
+            co.title = f"Battle Card - {competitor.name}"
+
+        co.status = "draft"
+        db.commit()
+        db.refresh(co)
+        logger.info("Content generation complete for output %s", co.id)
+    except Exception as e:
+        logger.exception("Content generation failed for output %s", co.id)
+        co.status = "failed"
+        co.error_message = str(e)
+        db.commit()
+        db.refresh(co)
+
+    # Reload with competitor relationship for serialization
+    co = (
+        db.query(ContentOutput)
+        .options(joinedload(ContentOutput.competitor))
+        .filter(ContentOutput.id == co.id)
+        .first()
+    )
+    return _output_to_response(co)
+
+
+@router.put("/{output_id}", response_model=ContentOutputResponse)
+def update_content_output(
+    output_id: str,
+    body: ContentOutputUpdate,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """Update editable fields of a content output (title, content)."""
+    co = (
+        db.query(ContentOutput)
+        .options(joinedload(ContentOutput.competitor))
+        .filter(ContentOutput.id == uuid.UUID(output_id))
+        .first()
+    )
+    if not co:
+        raise HTTPException(status_code=404, detail="Content output not found")
+
+    update_data = body.model_dump(exclude_unset=True)
+    for field, value in update_data.items():
+        setattr(co, field, value)
+
+    db.commit()
+    db.refresh(co)
+    return _output_to_response(co)
+
+
+@router.delete("/{output_id}", status_code=204)
+def delete_content_output(
+    output_id: str,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """Hard-delete a content output. Content outputs are regenerable."""
+    co = db.query(ContentOutput).filter(ContentOutput.id == uuid.UUID(output_id)).first()
+    if not co:
+        raise HTTPException(status_code=404, detail="Content output not found")
+    db.delete(co)
+    db.commit()
+    return None
+
+
+@router.patch("/{output_id}/status", response_model=ContentOutputResponse)
+def update_content_output_status(
+    output_id: str,
+    body: StatusUpdate,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """Change the status of a content output.
+
+    Approval requires admin role.
+    """
+    if body.status not in VALID_STATUSES:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Invalid status. Must be one of: {', '.join(sorted(VALID_STATUSES))}",
+        )
+
+    co = (
+        db.query(ContentOutput)
+        .options(joinedload(ContentOutput.competitor))
+        .filter(ContentOutput.id == uuid.UUID(output_id))
+        .first()
+    )
+    if not co:
+        raise HTTPException(status_code=404, detail="Content output not found")
+
+    # Approval requires admin
+    if body.status == "approved":
+        if current_user.role != "admin":
+            raise HTTPException(status_code=403, detail="Only admins can approve content")
+        co.approved_by = current_user.id
+        co.approved_at = datetime.now(timezone.utc)
+
+    co.status = body.status
+    db.commit()
+    db.refresh(co)
+
+    return _output_to_response(co)
+
+
+@router.post("/{output_id}/publish", response_model=ContentOutputResponse, status_code=200)
+def publish_content_output(
+    output_id: str,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """Publish approved content to Google Docs.
+
+    Requires admin role. Only approved content can be published.
+    Checks for Google credentials before attempting.
+    Calls Google Docs service synchronously.
+    On failure: keeps status as 'approved', stores error in error_message.
+    """
+    if current_user.role != "admin":
+        raise HTTPException(status_code=403, detail="Only admins can publish content")
+
+    co = db.query(ContentOutput).options(
+        joinedload(ContentOutput.competitor)
+    ).filter(ContentOutput.id == uuid.UUID(output_id)).first()
+    if not co:
+        raise HTTPException(status_code=404, detail="Content output not found")
+
+    if co.status != "approved":
+        raise HTTPException(status_code=400, detail="Only approved content can be published")
+
+    if not current_user.google_refresh_token:
+        raise HTTPException(
+            status_code=400,
+            detail="Google credentials not configured. Please sign out and sign back in to grant Google Docs permissions.",
+        )
+
+    try:
+        from backend.services.google_docs_service import GoogleDocsService
+        service = GoogleDocsService()
+        service.publish_doc(db, co, current_user)
+    except Exception as e:
+        logger.exception("Google Docs publish failed for output %s", co.id)
+        co.error_message = f"Google Docs publish failed: {str(e)}"
+        db.commit()
+        # Keep status as "approved" — don't revert to "failed"
+
+    # Reload for serialization
+    co = db.query(ContentOutput).options(
+        joinedload(ContentOutput.competitor)
+    ).filter(ContentOutput.id == co.id).first()
+    return _output_to_response(co)

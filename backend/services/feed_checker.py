@@ -32,12 +32,48 @@ class FeedChecker:
     # ------------------------------------------------------------------
 
     def run(self) -> CheckRun:
-        """Execute a full feed-check run.
+        """Execute a full feed-check run (fetch + LLM analysis).
+
+        For backward compatibility. Calls run_fetch_only() then runs LLM analysis.
+        """
+        check_run, new_items_total = self.run_fetch_only()
+
+        # Run LLM analysis on unprocessed items
+        errors: list[str] = []
+        cards_generated = 0
+        if new_items_total > 0:
+            try:
+                cards_generated = self.analyzer.process_unprocessed_items(
+                    self.db, check_run_id=check_run.id,
+                )
+            except Exception as exc:
+                logger.exception("LLM analysis phase failed")
+                errors.append(f"LLM analysis: {exc}")
+
+        # Update check_run with analysis results
+        check_run.cards_generated = cards_generated
+        check_run.completed_at = datetime.now(timezone.utc)
+
+        if errors:
+            # Append LLM errors to any existing fetch errors
+            existing_errors = check_run.error_log or ""
+            all_errors = existing_errors + ("\n" if existing_errors else "") + "\n".join(errors)
+            check_run.error_log = all_errors.strip()
+
+        self.db.commit()
+        self.db.refresh(check_run)
+        return check_run
+
+    def run_fetch_only(self) -> tuple[CheckRun, int]:
+        """Execute feed fetching only (no LLM analysis).
 
         1. Create a check_run with status='running'
         2. Iterate all active feeds
         3. For each feed: fetch, parse, dedup, insert new items
-        4. Update check_run with counts and status
+        4. Update check_run with fetch counts and status
+
+        Returns (check_run, new_items_total) so the caller can decide
+        whether to run LLM analysis synchronously or in the background.
         """
         check_run = self._create_check_run()
         feeds_checked = 0
@@ -62,21 +98,9 @@ class FeedChecker:
                 errors.append(error_msg)
                 self._record_feed_error(feed, str(exc))
 
-        # Run LLM analysis on unprocessed items
-        cards_generated = 0
-        if new_items_total > 0:
-            try:
-                cards_generated = self.analyzer.process_unprocessed_items(
-                    self.db, check_run_id=check_run.id,
-                )
-            except Exception as exc:
-                logger.exception("LLM analysis phase failed")
-                errors.append(f"LLM analysis: {exc}")
-
-        # Finalize check_run
+        # Finalize check_run with fetch-only results
         check_run.feeds_checked = feeds_checked
         check_run.new_items_found = new_items_total
-        check_run.cards_generated = cards_generated
         check_run.completed_at = datetime.now(timezone.utc)
 
         if errors:
@@ -91,7 +115,7 @@ class FeedChecker:
 
         self.db.commit()
         self.db.refresh(check_run)
-        return check_run
+        return check_run, new_items_total
 
     # ------------------------------------------------------------------
     # Internal helpers

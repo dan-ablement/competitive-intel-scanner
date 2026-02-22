@@ -44,8 +44,6 @@ const PRIORITY_CONFIG: { value: Priority; label: string; letter: string; bg: str
 interface CardForm {
   title: string;
   summary: string;
-  impact_assessment: string;
-  suggested_counter_moves: string;
   event_type: EventType;
   priority: Priority;
 }
@@ -66,8 +64,6 @@ export default function CardDetail() {
   const [form, setForm] = useState<CardForm>({
     title: "",
     summary: "",
-    impact_assessment: "",
-    suggested_counter_moves: "",
     event_type: "other",
     priority: "green",
   });
@@ -77,8 +73,6 @@ export default function CardDetail() {
       setForm({
         title: card.title ?? "",
         summary: card.summary ?? "",
-        impact_assessment: card.impact_assessment ?? "",
-        suggested_counter_moves: card.suggested_counter_moves ?? "",
         event_type: card.event_type,
         priority: card.priority,
       });
@@ -154,29 +148,27 @@ export default function CardDetail() {
             />
           </div>
 
-          {/* Impact Assessment */}
-          <div className="space-y-2">
-            <label className="text-sm font-medium">Impact Assessment</label>
-            <textarea
-              value={form.impact_assessment}
-              onChange={(e) => setForm((prev) => ({ ...prev, impact_assessment: e.target.value }))}
-              placeholder="How does this impact Augment Code..."
-              rows={6}
-              className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring"
-            />
-          </div>
-
-          {/* Suggested Counter-moves */}
-          <div className="space-y-2">
-            <label className="text-sm font-medium">Suggested Counter-moves</label>
-            <textarea
-              value={form.suggested_counter_moves}
-              onChange={(e) => setForm((prev) => ({ ...prev, suggested_counter_moves: e.target.value }))}
-              placeholder="Recommended actions and responses..."
-              rows={6}
-              className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring"
-            />
-          </div>
+          {/* Legacy fields — read-only, collapsed, only shown for old cards with values */}
+          {card.impact_assessment && (
+            <details className="rounded-lg border border-border">
+              <summary className="cursor-pointer px-4 py-3 text-sm font-medium text-muted-foreground hover:bg-muted/50">
+                Impact Assessment (legacy)
+              </summary>
+              <div className="border-t border-border px-4 py-3 text-sm whitespace-pre-wrap text-muted-foreground">
+                {card.impact_assessment}
+              </div>
+            </details>
+          )}
+          {card.suggested_counter_moves && (
+            <details className="rounded-lg border border-border">
+              <summary className="cursor-pointer px-4 py-3 text-sm font-medium text-muted-foreground hover:bg-muted/50">
+                Suggested Counter-moves (legacy)
+              </summary>
+              <div className="border-t border-border px-4 py-3 text-sm whitespace-pre-wrap text-muted-foreground">
+                {card.suggested_counter_moves}
+              </div>
+            </details>
+          )}
 
           {/* Save button (bottom) */}
           <div className="flex items-center justify-between border-t border-border pt-4">

@@ -1,5 +1,5 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { listCheckRuns, getSettings, updateSettings, triggerFeedCheck, triggerProfileReview, type SystemSettings } from "@/api/system";
+import { listCheckRuns, getSettings, updateSettings, triggerFeedCheck, triggerProfileReview, getKVSetting, setKVSetting, type SystemSettings } from "@/api/system";
 
 export function useCheckRuns() {
   return useQuery({
@@ -35,6 +35,25 @@ export function useTriggerFeedCheck() {
 export function useTriggerProfileReview() {
   return useMutation({
     mutationFn: triggerProfileReview,
+  });
+}
+
+export function useKVSetting(key: string) {
+  return useQuery({
+    queryKey: ["kv-settings", key],
+    queryFn: () => getKVSetting(key),
+    enabled: !!key,
+  });
+}
+
+export function useSetKVSetting() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({ key, value }: { key: string; value: string | null }) =>
+      setKVSetting(key, value),
+    onSuccess: (_data, variables) => {
+      queryClient.invalidateQueries({ queryKey: ["kv-settings", variables.key] });
+    },
   });
 }
 

@@ -22,6 +22,8 @@ class User(Base):
         default="viewer",
     )
     google_id: Mapped[str] = mapped_column(String, unique=True, nullable=False)
+    google_refresh_token: Mapped[str | None] = mapped_column(String, nullable=True)
+    google_access_token: Mapped[str | None] = mapped_column(String, nullable=True)
     created_at: Mapped[datetime] = mapped_column(default=func.now(), nullable=False)
     updated_at: Mapped[datetime] = mapped_column(default=func.now(), onupdate=func.now(), nullable=False)
 

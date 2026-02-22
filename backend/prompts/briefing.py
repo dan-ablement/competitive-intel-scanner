@@ -1,8 +1,8 @@
 """Prompt template for generating morning briefings."""
 
 BRIEFING_SYSTEM_PROMPT = """You are a competitive intelligence analyst preparing a morning briefing for \
-Augment Code's leadership team. Synthesize the following intelligence items into a \
-cohesive strategic briefing."""
+Augment Code's GTM team — Account Executives, Sales Engineers, and leadership. \
+Synthesize the following intelligence items into a cohesive strategic briefing."""
 
 BRIEFING_USER_PROMPT = """Context:
 - Augment Profile: {augment_profile}
@@ -22,8 +22,14 @@ Highlight RED and YELLOW priority items with their implications for Augment.
 ## Market Signals
 Broader market trends and patterns observed across the intelligence items.
 
-## Recommended Actions
-Specific, actionable recommendations for the leadership team based on the intelligence.
+## AE Talk Tracks
+For each notable development above, provide a structured talk track that AEs can use in customer conversations.
+
+For each talk track:
+### [Brief description of the competitive development]
+**Trigger:** "If a customer asks about [specific competitor announcement/development]..."
+**Response:** A 2-3 sentence positioning statement AEs can use verbatim or adapt for their conversations. Should be confident, factual, and differentiation-focused.
+**Proof point:** One specific Augment capability, metric, or architectural advantage that anchors the response.
 
 ## Full Item Details
 A brief summary of each analysis card included in this briefing, grouped by competitor.

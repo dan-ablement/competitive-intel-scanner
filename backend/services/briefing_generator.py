@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import json
 import logging
+import random
 import time
 import uuid
 from datetime import date, datetime, timedelta, timezone
@@ -23,8 +24,9 @@ from backend.utils import utc_isoformat
 logger = logging.getLogger(__name__)
 
 MODEL = "claude-sonnet-4-20250514"
-MAX_RETRIES = 3
-BASE_DELAY = 2  # seconds
+MAX_RETRIES = 5
+BASE_DELAY = 15  # seconds
+RATE_LIMIT_MIN_DELAY = 60  # minimum seconds to wait on rate limit (per-minute quota)
 
 
 class BriefingGenerator:
@@ -175,7 +177,11 @@ class BriefingGenerator:
         return json.dumps(card_dicts, indent=2)
 
     def _call_claude(self, system_prompt: str, user_prompt: str) -> str:
-        """Call Claude API with exponential backoff retry."""
+        """Call Claude API with rate-limit-aware retry.
+
+        For RateLimitError (429): waits at least 60s (per-minute quota) plus jitter.
+        For other APIErrors: uses exponential backoff with BASE_DELAY.
+        """
         for attempt in range(MAX_RETRIES):
             try:
                 message = self.client.messages.create(
@@ -193,9 +199,10 @@ class BriefingGenerator:
                 return response_text
             except anthropic.RateLimitError:
                 if attempt < MAX_RETRIES - 1:
-                    delay = BASE_DELAY * (2 ** attempt)
+                    # Per-minute rate limit — wait at least 60s plus jitter
+                    delay = RATE_LIMIT_MIN_DELAY + random.uniform(0, 5)
                     logger.warning(
-                        "Rate limited, retrying in %ds (attempt %d/%d)",
+                        "Rate limited (429), waiting %.1fs (attempt %d/%d)",
                         delay, attempt + 1, MAX_RETRIES,
                     )
                     time.sleep(delay)

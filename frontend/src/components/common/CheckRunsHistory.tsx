@@ -82,7 +82,16 @@ function CheckRunRow({ run }: { run: CheckRun }) {
         </td>
         <td className="px-4 py-3 text-center text-sm">{run.feeds_checked}</td>
         <td className="px-4 py-3 text-center text-sm">{run.new_items_found}</td>
-        <td className="px-4 py-3 text-center text-sm">{run.cards_generated}</td>
+        <td className="px-4 py-3 text-center text-sm">
+          {run.status === "completed" && run.new_items_found > 0 && run.cards_generated === 0 ? (
+            <span className="inline-flex items-center gap-1 text-xs text-blue-600">
+              <Loader2 className="h-3 w-3 animate-spin" />
+              Analyzing…
+            </span>
+          ) : (
+            run.cards_generated
+          )}
+        </td>
         <td className="px-4 py-3 text-center">
           {hasError ? (
             <button
@@ -162,7 +171,13 @@ export function CheckRunsHistory() {
       )}
 
       {/* Trigger success */}
-      {triggerCheck.isSuccess && (
+      {triggerCheck.isSuccess && triggerCheck.data.analysis_status === "pending" && (
+        <div className="mt-3 flex items-start gap-2 rounded-md bg-blue-50 px-4 py-3 text-sm text-blue-700">
+          <Loader2 className="mt-0.5 h-4 w-4 shrink-0 animate-spin" />
+          Feed check completed — {triggerCheck.data.feeds_checked} feeds checked, {triggerCheck.data.new_items_found} new items found. LLM analysis is running in the background.
+        </div>
+      )}
+      {triggerCheck.isSuccess && triggerCheck.data.analysis_status !== "pending" && (
         <div className="mt-3 flex items-start gap-2 rounded-md bg-green-50 px-4 py-3 text-sm text-green-700">
           <CheckCircle2 className="mt-0.5 h-4 w-4 shrink-0" />
           Feed check completed — {triggerCheck.data.feeds_checked} feeds checked, {triggerCheck.data.new_items_found} new items found.
