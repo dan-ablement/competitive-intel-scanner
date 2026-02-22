@@ -45,6 +45,7 @@ class ContentOutputResponse(BaseModel):
     google_doc_id: Optional[str] = None
     google_doc_url: Optional[str] = None
     approved_by: Optional[str] = None
+    approved_by_name: Optional[str] = None
     approved_at: Optional[str] = None
     published_at: Optional[str] = None
     error_message: Optional[str] = None
@@ -112,6 +113,7 @@ def _output_to_response(co: ContentOutput) -> dict:
         "google_doc_id": co.google_doc_id,
         "google_doc_url": co.google_doc_url,
         "approved_by": str(co.approved_by) if co.approved_by else None,
+        "approved_by_name": co.approver.name if co.approver else None,
         "approved_at": utc_isoformat(co.approved_at),
         "published_at": utc_isoformat(co.published_at),
         "error_message": co.error_message,
@@ -138,7 +140,7 @@ def list_content_outputs(
     current_user: User = Depends(get_current_user),
 ):
     """List content outputs with optional filters."""
-    query = db.query(ContentOutput).options(joinedload(ContentOutput.competitor))
+    query = db.query(ContentOutput).options(joinedload(ContentOutput.competitor), joinedload(ContentOutput.approver))
 
     if competitor_id:
         query = query.filter(ContentOutput.competitor_id == uuid.UUID(competitor_id))
@@ -245,7 +247,7 @@ def get_content_output(
     """Get a single content output by ID."""
     co = (
         db.query(ContentOutput)
-        .options(joinedload(ContentOutput.competitor))
+        .options(joinedload(ContentOutput.competitor), joinedload(ContentOutput.approver))
         .filter(ContentOutput.id == uuid.UUID(output_id))
         .first()
     )
@@ -326,7 +328,7 @@ def generate_content(
     # Reload with competitor relationship for serialization
     co = (
         db.query(ContentOutput)
-        .options(joinedload(ContentOutput.competitor))
+        .options(joinedload(ContentOutput.competitor), joinedload(ContentOutput.approver))
         .filter(ContentOutput.id == co.id)
         .first()
     )
@@ -343,7 +345,7 @@ def update_content_output(
     """Update editable fields of a content output (title, content)."""
     co = (
         db.query(ContentOutput)
-        .options(joinedload(ContentOutput.competitor))
+        .options(joinedload(ContentOutput.competitor), joinedload(ContentOutput.approver))
         .filter(ContentOutput.id == uuid.UUID(output_id))
         .first()
     )
@@ -393,7 +395,7 @@ def update_content_output_status(
 
     co = (
         db.query(ContentOutput)
-        .options(joinedload(ContentOutput.competitor))
+        .options(joinedload(ContentOutput.competitor), joinedload(ContentOutput.approver))
         .filter(ContentOutput.id == uuid.UUID(output_id))
         .first()
     )
@@ -431,7 +433,7 @@ def publish_content_output(
         raise HTTPException(status_code=403, detail="Only admins can publish content")
 
     co = db.query(ContentOutput).options(
-        joinedload(ContentOutput.competitor)
+        joinedload(ContentOutput.competitor), joinedload(ContentOutput.approver)
     ).filter(ContentOutput.id == uuid.UUID(output_id)).first()
     if not co:
         raise HTTPException(status_code=404, detail="Content output not found")
@@ -457,6 +459,6 @@ def publish_content_output(
 
     # Reload for serialization
     co = db.query(ContentOutput).options(
-        joinedload(ContentOutput.competitor)
+        joinedload(ContentOutput.competitor), joinedload(ContentOutput.approver)
     ).filter(ContentOutput.id == co.id).first()
     return _output_to_response(co)

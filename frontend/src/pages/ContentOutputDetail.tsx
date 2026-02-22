@@ -145,7 +145,7 @@ function ContentApprovalWorkflow({
             <CheckCircle2 className="h-4 w-4" />
             <span>
               Approved on {new Date(output.approved_at).toLocaleDateString()}
-              {output.approved_by && ` by ${output.approved_by}`}
+              {output.approved_by && ` by ${output.approved_by_name || output.approved_by}`}
             </span>
           </div>
         </div>
@@ -593,7 +593,7 @@ export default function ContentOutputDetail() {
               {output.approved_by && (
                 <div className="flex justify-between">
                   <dt className="text-muted-foreground">Approved by</dt>
-                  <dd>{output.approved_by}</dd>
+                  <dd>{output.approved_by_name || output.approved_by}</dd>
                 </div>
               )}
               {output.published_at && (

@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import logging
+
 from fastapi import APIRouter, Depends, HTTPException, Request
 from fastapi.responses import RedirectResponse
 from sqlalchemy.orm import Session
@@ -16,6 +18,7 @@ from backend.services.auth_service import (
 )
 
 router = APIRouter()
+logger = logging.getLogger(__name__)
 
 
 def get_current_user(request: Request, db: Session = Depends(get_db)) -> User:
@@ -65,6 +68,11 @@ async def google_callback(request: Request, db: Session = Depends(get_db)):
     # Store OAuth tokens for Google Docs integration
     refresh_token = token.get("refresh_token")
     access_token = token.get("access_token")
+    logger.info(
+        "OAuth callback: refresh_token=%s, access_token=%s",
+        "present" if refresh_token else "MISSING",
+        "present" if access_token else "MISSING",
+    )
     if refresh_token:
         user.google_refresh_token = refresh_token
     if access_token:

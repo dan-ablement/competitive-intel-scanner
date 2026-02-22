@@ -109,6 +109,7 @@ class TestOutputToResponseOptionalFields:
         assert result["google_doc_id"] is None
         assert result["google_doc_url"] is None
         assert result["approved_by"] is None
+        assert result["approved_by_name"] is None
         assert result["approved_at"] is None
         assert result["published_at"] is None
         assert result["error_message"] is None
@@ -118,11 +119,13 @@ class TestOutputToResponseOptionalFields:
         tid = uuid.uuid4()
         uid = uuid.uuid4()
         now = datetime.now(timezone.utc)
+        approver_mock = SimpleNamespace(name="Jane Admin")
         co = make_content_output(
             template_id=tid,
             google_doc_id="doc-123",
             google_doc_url="https://docs.google.com/doc-123",
             approved_by=uid,
+            approver=approver_mock,
             approved_at=now,
             published_at=now,
             error_message="some error",
@@ -133,6 +136,7 @@ class TestOutputToResponseOptionalFields:
         assert result["google_doc_id"] == "doc-123"
         assert result["google_doc_url"] == "https://docs.google.com/doc-123"
         assert result["approved_by"] == str(uid)
+        assert result["approved_by_name"] == "Jane Admin"
         assert result["approved_at"] is not None
         assert result["published_at"] is not None
         assert result["error_message"] == "some error"

@@ -186,6 +186,7 @@ def make_content_output():
             template_id=template_id or uuid.uuid4(),
             google_doc_id=None,
             google_doc_url=None,
+            approver=None,
             approved_by=None,
             approved_at=None,
             published_at=None,

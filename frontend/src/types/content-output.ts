@@ -19,6 +19,7 @@ export interface ContentOutput {
   google_doc_id: string | null;
   google_doc_url: string | null;
   approved_by: string | null;
+  approved_by_name: string | null;
   approved_at: string | null;
   published_at: string | null;
   raw_llm_output: Record<string, unknown> | null;
